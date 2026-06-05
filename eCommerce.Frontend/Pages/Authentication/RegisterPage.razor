@@ -1,0 +1,202 @@
+﻿@page "/authentication/register"
+@using Microsoft.AspNetCore.Components.Forms
+@using ClientLibrary.Models.Responses
+@using eCommerce.Frontend.Components.Base
+@layout Auth
+@inject eCommerce.Frontend.Localization.UiLocalizer L
+
+<div class="login-page beauty">
+    <div class="login-card">
+
+        <h2 class="login-title">@L.Get("create_account")</h2>
+
+        @if (_registered)
+        {
+            <div style="text-align:center;padding:20px 0">
+                <div style="font-size:2.5rem;margin-bottom:12px">✉</div>
+                <p style="color:#444;margin-bottom:8px"><strong>@L.Get("check_your_email")</strong></p>
+                <p style="color:#888;font-size:14px">@L.Get("confirm_email_msg")</p>
+                <a href="/authentication/login" class="btn btn-dark w-100 mt-4">@L.Get("go_to_login")</a>
+            </div>
+        }
+        else
+        {
+
+        <div class="account-type">
+            <button type="button"
+                    class="type-option @(IsInfluencer ? "" : "active")"
+                    @onclick="SelectCustomer">
+                @L.Get("customer")
+            </button>
+
+            <button type="button"
+                    class="type-option @(IsInfluencer ? "active" : "")"
+                    @onclick="SelectInfluencer">
+                @L.Get("influencer")
+            </button>
+        </div>
+
+        <EditForm EditContext="_editContext" OnValidSubmit="Register">
+            <DataAnnotationsValidator />
+
+            <AppInput @bind-Value="Model.Email" Label="@L.Get("email")" />
+            <AppInput @bind-Value="Model.FullName" Label="@L.Get("full_name")" />
+            <AppInput @bind-Value="Model.PhoneNumber" Label="@L.Get("phone_number")" />
+
+            <AppInput @bind-Value="Model.Password" Label="@L.Get("password")" Type="password" />
+
+            @if (!string.IsNullOrEmpty(Model.Password))
+            {
+                <div class="pw-rules">
+                    <div class="pw-rule @(Rule_MinLength ? "pw-rule--pass" : "pw-rule--fail")">
+                        <i class="fa @(Rule_MinLength ? "fa-check" : "fa-xmark")"></i>
+                        At least 8 characters
+                    </div>
+                    <div class="pw-rule @(Rule_Uppercase ? "pw-rule--pass" : "pw-rule--fail")">
+                        <i class="fa @(Rule_Uppercase ? "fa-check" : "fa-xmark")"></i>
+                        One uppercase letter (A–Z)
+                    </div>
+                    <div class="pw-rule @(Rule_Lowercase ? "pw-rule--pass" : "pw-rule--fail")">
+                        <i class="fa @(Rule_Lowercase ? "fa-check" : "fa-xmark")"></i>
+                        One lowercase letter (a–z)
+                    </div>
+                    <div class="pw-rule @(Rule_Digit ? "pw-rule--pass" : "pw-rule--fail")">
+                        <i class="fa @(Rule_Digit ? "fa-check" : "fa-xmark")"></i>
+                        One number (0–9)
+                    </div>
+                    <div class="pw-rule @(Rule_Special ? "pw-rule--pass" : "pw-rule--fail")">
+                        <i class="fa @(Rule_Special ? "fa-check" : "fa-xmark")"></i>
+                        One special character (!@@#$…)
+                    </div>
+                </div>
+            }
+
+            <AppInput @bind-Value="Model.ConfirmPassword" Label="@L.Get("confirm_password")" Type="password" />
+
+            @if (IsInfluencer)
+            {
+                <div class="divider">@L.Get("influencer_details")</div>
+
+                <AppInput @bind-Value="Model.InstagramUrl" Label="@L.Get("instagram_url")" />
+                <AppInput @bind-Value="Model.TikTokUrl" Label="@L.Get("tiktok_url")" />
+            }
+
+            <GlobalError Error="@Message" />
+
+            <button class="btn btn-dark mt-3 w-100" type="submit">
+                @(IsInfluencer ? L.Get("apply_influencer") : L.Get("register"))
+            </button>
+
+            <div class="text-center mt-3" style="font-size:13px; color:#aaa;">
+                @L.Get("already_have_account") <a href="/authentication/login">@L.Get("login")</a>
+            </div>
+
+        </EditForm>
+
+        } @* end else (not yet registered) *@
+
+    </div>
+</div>
+
+@code {
+    bool IsInfluencer = false;
+    bool _registered = false;
+    string Message = string.Empty;
+    RegisterViewModel Model = new();
+
+    // Live password rule checks
+    bool Rule_MinLength => (Model.Password?.Length ?? 0) >= 8;
+    bool Rule_Uppercase => Model.Password?.Any(char.IsUpper) == true;
+    bool Rule_Lowercase => Model.Password?.Any(char.IsLower) == true;
+    bool Rule_Digit     => Model.Password?.Any(char.IsDigit) == true;
+    bool Rule_Special   => Model.Password?.Any(c => !char.IsLetterOrDigit(c) && c != '_') == true;
+
+    EditContext _editContext;
+    ValidationMessageStore _messageStore;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(Model);
+        _messageStore = new ValidationMessageStore(_editContext);
+    }
+
+    void SelectCustomer()
+    {
+        IsInfluencer = false;
+        Model.IsInfluencer = false;
+        Model.PhoneNumber = null;
+        Model.InstagramUrl = null;
+        Model.TikTokUrl = null;
+    }
+
+    void SelectInfluencer()
+    {
+        IsInfluencer = true;
+        Model.IsInfluencer = true;
+    }
+
+    async Task Register()
+    {
+        _messageStore.Clear();
+        Message = string.Empty;
+
+        ServiceResponse<Guid> result;
+
+        if (IsInfluencer)
+        {
+            var dto = new RegisterInfluencerDTO
+            {
+                Email = Model.Email,
+                Password = Model.Password,
+                ConfirmPassword = Model.ConfirmPassword,
+                FullName = Model.FullName,
+                PhoneNumber = Model.PhoneNumber!,
+                InstagramAccountUrl = Model.InstagramUrl!,
+                TikTokAccountUrl = Model.TikTokUrl!
+            };
+
+            result = await authService.RegisterInfluencer(dto);
+        }
+        else
+        {
+            var dto = new RegisterUserDTO
+            {
+                Email = Model.Email,
+                PhoneNumber = Model.PhoneNumber,
+                Password = Model.Password,
+                ConfirmPassword = Model.ConfirmPassword,
+                FullName = Model.FullName
+            };
+
+            result = await authService.RegisterUser(dto);
+        }
+
+        if (!result.Success)
+        {
+            HandleErrors(result.Message);
+            return;
+        }
+
+        _registered = true;
+    }
+
+    void HandleErrors(string error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            Message = L.Get("something_wrong");
+            return;
+        }
+
+        if (error.Contains("email", StringComparison.OrdinalIgnoreCase))
+        {
+            _messageStore.Add(() => Model.Email, L.Get("email_exists"));
+        }
+        else
+        {
+            Message = error;
+        }
+
+        _editContext.NotifyValidationStateChanged();
+    }
+}

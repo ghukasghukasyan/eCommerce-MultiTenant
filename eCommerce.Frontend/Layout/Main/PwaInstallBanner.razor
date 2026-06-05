@@ -1,0 +1,93 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_show)
+{
+    <div class="pwa-banner">
+        <div class="pwa-banner-header">
+            <div class="pwa-banner-brand">
+                <img src="images/logo.png" class="pwa-banner-icon" alt="" />
+                <div>
+                    <div class="pwa-banner-title">Add to Home Screen</div>
+                    <div class="pwa-banner-sub">Quick access, anytime.</div>
+                </div>
+            </div>
+            <button class="pwa-banner-close" @onclick="Dismiss" aria-label="Close">
+                <i class="fa fa-xmark"></i>
+            </button>
+        </div>
+
+        @if (_isIos)
+        {
+            <div class="pwa-banner-steps">
+                <div class="pwa-banner-step">
+                    <span class="pwa-step-num">1</span>
+                    Tap <i class="fa fa-arrow-up-from-bracket pwa-share-icon" style="margin:0 4px"></i> at the bottom of Safari
+                </div>
+                <div class="pwa-banner-step">
+                    <span class="pwa-step-num">2</span>
+                    Choose <b>&ldquo;Add to Home Screen&rdquo;</b>
+                </div>
+            </div>
+            <button class="pwa-banner-skip" @onclick="Dismiss">Not now</button>
+        }
+        else
+        {
+            <button class="pwa-banner-cta" @onclick="InstallAsync">Install App</button>
+            <button class="pwa-banner-skip" @onclick="Dismiss">Not now</button>
+        }
+    </div>
+}
+
+@code {
+    private bool _show;
+    private bool _isIos;
+    private readonly CancellationTokenSource _cts = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            var isStandalone = await JS.InvokeAsync<bool>("PwaInstall.isStandalone");
+            var wasDismissed = await JS.InvokeAsync<bool>("PwaInstall.wasDismissed");
+            if (isStandalone || wasDismissed) return;
+
+            await Task.Delay(5000, _cts.Token);
+
+            var isInstallable = await JS.InvokeAsync<bool>("PwaInstall.isInstallable");
+            _isIos = await JS.InvokeAsync<bool>("PwaInstall.isIosSafari");
+
+            if (isInstallable || _isIos)
+            {
+                _show = true;
+                StateHasChanged();
+            }
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PWA] Banner error: {ex.Message}");
+        }
+    }
+
+    private async Task InstallAsync()
+    {
+        _show = false;
+        await JS.InvokeAsync<bool>("PwaInstall.promptInstall");
+        await JS.InvokeVoidAsync("PwaInstall.dismiss");
+    }
+
+    private async Task Dismiss()
+    {
+        _show = false;
+        await JS.InvokeVoidAsync("PwaInstall.dismiss");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        _cts.Dispose();
+    }
+}

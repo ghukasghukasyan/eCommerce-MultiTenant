@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title></title>
+    <base href="/" />
+    <link href="/css/app.css?v=23" rel="stylesheet" />
+    <link href="/css/footer.css?v=23" rel="stylesheet" />
+    <link href="/css/legal.css?v=1" rel="stylesheet" />
+    <link href="/css/maintenance.css?v=23" rel="stylesheet" />
+    <link href="/css/header.css?v=23" rel="stylesheet" />
+    <link href="/css/bottom-nav.css?v=3" rel="stylesheet" />
+    <link href="/css/home.css?v=23" rel="stylesheet" />
+    <link href="/css/shop.css?v=23" rel="stylesheet" />
+    <link href="/css/auth.css?v=23" rel="stylesheet" />
+    <link href="/css/checkout.css?v=24" rel="stylesheet" />
+    <link href="/css/order-success.css?v=23" rel="stylesheet" />
+    <link href="/css/productCard.css?v=23" rel="stylesheet" />
+    <link href="/css/product-detail.css?v=24" rel="stylesheet" />
+    <link href="/css/user/user.css?v=23" rel="stylesheet" />
+    <link href="/css/user/user-profile.css?v=23" rel="stylesheet" />
+    <link href="/css/user/user-address.css?v=23" rel="stylesheet" />
+    <link href="/css/user/user-orders.css?v=23" rel="stylesheet" />
+    <link href="/css/admin/admin.css?v=26" rel="stylesheet" />
+    <link href="/css/admin/admin-products.css?v=23" rel="stylesheet" />
+    <link href="/css/admin/admin-sales.css?v=23" rel="stylesheet" />
+    <link href="/css/admin/admin-categories.css?v=23" rel="stylesheet" />
+    <link href="/css/admin/admin-dashboard.css?v=25" rel="stylesheet" />
+    <link href="/css/admin/admin-influencers.css?v=24" rel="stylesheet" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/images/logo.png" />
+    <meta name="theme-color" content="#111111" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link href="/eCommerce.Frontend.styles.css?v=23" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="/font-awesome/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&family=Jost:wght@300;400;500;600&family=Great+Vibes&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <link href="_content/Blazored.Typeahead/blazored-typeahead.css" rel="stylesheet" />
+    <script>
+        // Detect PWA standalone mode (used by Blazor components via JS interop)
+        window.isPwaMode = function () {
+            return window.navigator.standalone === true ||
+                   window.matchMedia('(display-mode: standalone)').matches;
+        };
+        if (window.isPwaMode()) {
+            document.body.classList.add('pwa-mode');
+        }
+
+        fetch('/tenant.json')
+            .then(function(r) { return r.json(); })
+            .then(function(t) {
+                var name = t.StoreName || '';
+                if (name) {
+                    document.title = name;
+                    var appleTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+                    if (!appleTitleMeta) {
+                        appleTitleMeta = document.createElement('meta');
+                        appleTitleMeta.name = 'apple-mobile-web-app-title';
+                        document.head.appendChild(appleTitleMeta);
+                    }
+                    appleTitleMeta.content = name;
+                    var el = document.querySelector('.app-loading-brand');
+                    if (el) {
+                        if (t.LogoUrl) {
+                            var img = document.createElement('img');
+                            img.src = t.LogoUrl;
+                            img.alt = name;
+                            img.className = 'app-loading-logo';
+                            el.appendChild(img);
+                        } else {
+                            el.textContent = name;
+                        }
+                    }
+                    // Update PWA manifest name dynamically from tenant config
+                    var manifestLink = document.querySelector('link[rel="manifest"]');
+                    if (manifestLink) {
+                        fetch('/manifest.json')
+                            .then(function(r) { return r.json(); })
+                            .then(function(m) {
+                                m.name = name;
+                                m.short_name = name;
+                                var blob = new Blob([JSON.stringify(m)], { type: 'application/json' });
+                                manifestLink.setAttribute('href', URL.createObjectURL(blob));
+                            })
+                            .catch(function() {});
+                    }
+                }
+                var gaId = t.GoogleAnalyticsId || '';
+                if (gaId) {
+                    var s = document.createElement('script');
+                    s.async = true;
+                    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+                    document.head.appendChild(s);
+                    window.dataLayer = window.dataLayer || [];
+                    window.gtag = function(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', gaId);
+                }
+            })
+            .catch(function() {});
+    </script>
+    <script src="js/pwa-install.js"></script>
+    <script src="js/cookie.js"></script>
+    <script src="_content/Blazored.Typeahead/blazored-typeahead.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="app-loading">
+            <div class="app-loading-brand"></div>
+            <div class="app-loading-bar">
+                <div class="app-loading-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        <div class="blazor-err-content">
+            <div class="blazor-err-icon">
+                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="56" height="56">
+                    <circle cx="32" cy="32" r="30" stroke="#e8e8e8" stroke-width="1.5"/>
+                    <path d="M32 18v18" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="32" cy="43" r="2" fill="#c4826a"/>
+                </svg>
+            </div>
+            <p class="blazor-err-label">Something went wrong</p>
+            <h1 class="blazor-err-title">We'll be right back</h1>
+            <p class="blazor-err-sub">We're experiencing a temporary issue. Please try reloading the page.</p>
+            <div class="blazor-err-actions">
+                <a href="." class="blazor-err-btn-primary">Reload page</a>
+                <span class="blazor-err-dismiss dismiss">Dismiss</span>
+            </div>
+        </div>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>
+        window.setBodyScroll = function (enabled) {
+            document.body.style.overflow = enabled ? '' : 'hidden';
+        };
+
+        window.scrollTabIntoView = function (scrollContainerId, activeTabId) {
+            var container = document.getElementById(scrollContainerId);
+            var tab = document.getElementById(activeTabId);
+            if (!container || !tab) return;
+            var tabLeft = tab.offsetLeft;
+            var tabWidth = tab.offsetWidth;
+            var containerWidth = container.offsetWidth;
+            var target = tabLeft - (containerWidth / 2) + (tabWidth / 2);
+            container.scrollTo({ left: target, behavior: 'smooth' });
+        };
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
+</body>
+
+</html>

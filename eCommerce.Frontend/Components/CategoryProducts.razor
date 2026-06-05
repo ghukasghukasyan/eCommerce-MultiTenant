@@ -1,0 +1,207 @@
+﻿@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@inject CartHelper CartHelper
+
+@if (ShowSortBar && !_isLoading && _products.Any())
+{
+    <div class="sort-toolbar">
+        <span class="sort-toolbar-count">
+            <span class="sort-toolbar-count-num">@_sorted.Count()</span>
+            @L.Get("products")
+        </span>
+
+        <div class="sort-toolbar-right">
+
+            <!-- FILTER BUTTON -->
+            <button class="sort-trigger filter-trigger @(_filterOpen ? "open" : "") @(_inStockOnly ? "filter-active" : "")"
+                    @onclick="ToggleFilter">
+                <i class="fas fa-sliders-h sort-trigger-icon"></i>
+                <span>Filter@(_inStockOnly ? " •" : "")</span>
+            </button>
+
+            <!-- SORT DROPDOWN -->
+            <div class="sort-dropdown @(_sortOpen ? "open" : "")">
+                <button class="sort-trigger" @onclick="ToggleSort" @onclick:stopPropagation="true">
+                    <span>@_sortOptions.First(o => o.Key == _sortBy).Label</span>
+                    <i class="fas fa-chevron-down sort-chevron"></i>
+                </button>
+
+                <div class="sort-panel" @onclick:stopPropagation="true">
+                    @foreach (var opt in _sortOptions)
+                    {
+                        <button class="sort-panel-item @(opt.Key == _sortBy ? "active" : "")"
+                                @onclick="() => SelectSort(opt.Key)">
+                            @if (opt.Key == _sortBy)
+                            {
+                                <i class="fas fa-check sort-check-icon"></i>
+                            }
+                            else
+                            {
+                                <span class="sort-panel-dot"></span>
+                            }
+                            @opt.Label
+                        </button>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- FILTER SHEET -->
+@if (_filterOpen)
+{
+    <div class="filter-backdrop" @onclick="CloseFilter"></div>
+    <div class="filter-sheet" @onclick:stopPropagation>
+        <div class="filter-sheet-handle"></div>
+        <div class="filter-sheet-header">
+            <span class="filter-sheet-title">Filter</span>
+            <button class="filter-sheet-close" @onclick="CloseFilter">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="filter-sheet-body">
+
+            <div class="filter-row">
+                <label class="filter-label">In Stock Only</label>
+                <button class="filter-toggle @(_inStockOnly ? "on" : "")" @onclick="ToggleInStock">
+                    <span class="filter-toggle-knob"></span>
+                </button>
+            </div>
+
+        </div>
+        <div class="filter-sheet-footer">
+            <button class="filter-clear-btn" @onclick="ClearFilters">Clear all</button>
+            <button class="filter-apply-btn" @onclick="CloseFilter">
+                Show @_sorted.Count() results
+            </button>
+        </div>
+    </div>
+}
+
+@if (_isLoading)
+{
+    <div class="product-grid">
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="skeleton-product">
+                <div class="skeleton-product-img"></div>
+                <div class="skeleton-product-body">
+                    <div class="skeleton-cell" style="height:14px; width:70%;"></div>
+                    <div class="skeleton-cell" style="height:12px; width:40%;"></div>
+                    <div class="skeleton-cell" style="height:36px; border-radius:100px; margin-top:4px;"></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else if (_sorted.Any())
+{
+    <div class="product-grid">
+        @foreach (var product in _sorted)
+        {
+            <ProductCard Product="product"
+                         OnAddToCart="@((qty) => AddToCart(product, qty))" />
+        }
+    </div>
+}
+else
+{
+    <p style="color:#aaa; font-size:14px;">@L["no_products_category"]</p>
+}
+
+@code {
+    [Parameter] public Guid? CategoryId { get; set; }
+    [Parameter] public int Take { get; set; } = 3;
+    [Parameter] public bool ShowSortBar { get; set; } = false;
+
+    private IEnumerable<GetProductDTO> _products = [];
+    private bool _isLoading;
+    private string _sortBy = "default";
+
+    private record SortOption(string Key, string Label);
+    private readonly SortOption[] _sortOptions =
+    [
+        new("default",    "Featured"),
+        new("price-asc",  "Price ↑"),
+        new("price-desc", "Price ↓"),
+        new("newest",     "Newest"),
+        new("name-asc",   "A – Z"),
+        new("name-desc",  "Z – A"),
+    ];
+
+    private bool _filterOpen = false;
+    private bool _inStockOnly = false;
+
+    private List<GetProductDTO> _sorted = new();
+
+    private void RebuildSorted()
+    {
+        var source = _inStockOnly ? _products.Where(p => p.Stock > 0) : _products;
+        _sorted = (_sortBy switch
+        {
+            "price-asc"  => source.OrderBy(p => p.Price),
+            "price-desc" => source.OrderByDescending(p => p.Price),
+            "newest"     => source.OrderByDescending(p => p.CreatedDate),
+            "name-asc"   => source.OrderBy(p => p.Name),
+            "name-desc"  => source.OrderByDescending(p => p.Name),
+            _            => source.OrderByDescending(p => p.IsBestSeller),
+        }).ToList();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CategoryId is null) return;
+
+        _isLoading = true;
+        _sortBy = "default";
+        _inStockOnly = false;
+        _products = (await categoryService
+            .GetProductsByCategory(CategoryId.Value))
+            .Take(Take);
+        _isLoading = false;
+        RebuildSorted();
+    }
+
+    private bool _sortOpen = false;
+
+    private void ToggleSort() => _sortOpen = !_sortOpen;
+
+    private void SelectSort(string key)
+    {
+        _sortBy = key;
+        _sortOpen = false;
+        RebuildSorted();
+    }
+
+    private void SetSort(string key) { _sortBy = key; RebuildSorted(); }
+
+    private void ToggleFilter() { _filterOpen = !_filterOpen; _sortOpen = false; }
+    private void CloseFilter()  => _filterOpen = false;
+    private void ToggleInStock() { _inStockOnly = !_inStockOnly; RebuildSorted(); }
+    private void ClearFilters()  { _inStockOnly = false; RebuildSorted(); }
+
+    private async Task AddToCart(GetProductDTO product, int quantity = 1)
+    {
+        if (product.Stock == 0) return;
+
+        var image = product.Images
+            .FirstOrDefault(i => i.IsMain)?.ImageUrl ?? "";
+
+        var defaultVariantAttrs = product.Variants?
+            .FirstOrDefault(v => v.VariantId == product.DefaultVariantId)?.Attributes;
+
+        await CartHelper.AddToCart(
+            product.DefaultVariantId,
+            product.Id,
+            product.Name,
+            image,
+            product.Price,
+            quantity,
+            defaultVariantAttrs);
+
+    }
+}
+

@@ -1,0 +1,323 @@
+﻿@page "/admin/category"
+@using System.ComponentModel.DataAnnotations
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@layout Admin
+@attribute [Authorize(Roles = "Admin")]
+
+@inject ICategoryService categoryService
+@inject ILogger<CategoryPage> Logger
+
+<GlobalError Error="@_pageError" />
+
+<div class="admin-page admin-category-page">
+
+    <!-- HEADER -->
+    <div class="admin-header">
+        <h2>Manage Categories</h2>
+
+        <button class="btn btn-primary"
+                @onclick="ShowAddCategoryDialog">
+            + Add Category
+        </button>
+    </div>
+
+    <!-- CARD -->
+    <div class="admin-card">
+
+        @if (IsLoading)
+        {
+            <TableSkeleton Rows="5" Widths='new[]{"30%","20%","15%","12%"}' />
+        }
+        else if (!Categories.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa fa-folder-open"></i></div>
+                <h4 class="empty-state-title">No categories yet</h4>
+                <p class="empty-state-sub">Get started by adding your first category.</p>
+                <button class="btn btn-primary" @onclick="ShowAddCategoryDialog">+ Add category</button>
+            </div>
+        }
+        else
+        {
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Parent</th>
+                        <th>Order</th>
+                        <th>Status</th>
+                        <th style="width: 200px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cat in Categories
+                                    .OrderBy(c => c.ParentCategoryId)
+                                    .ThenBy(c => c.DisplayOrder))
+                    {
+                        <tr>
+                            <td>
+                                @if (cat.ParentCategoryId != null)
+                                {
+                                    <span class="child-indent">—</span>
+                                }
+                                @cat.Name
+                            </td>
+                            <td>@(cat.ParentName ?? "Root")</td>
+                            <td>@cat.DisplayOrder</td>
+                            <td>
+                                @if (cat.IsActive)
+                                {
+                                    <span class="badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td class="action-cell">
+                                <div class="action-buttons">
+                                    <button class="update-btn"
+                                            @onclick="() => EditCategory(cat)">
+                                        Update
+                                    </button>
+
+                                    <button class="trash-btn"
+                                            @onclick="() => DeleteCategory(cat.Id)">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+    </div>
+</div>
+
+<!-- MODAL -->
+@if (ShowDialog)
+{
+    <div class="admin-modal-backdrop" @onclick="Cancel">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>@(IsEditMode ? "Update Category" : "Add Category")</h4>
+
+            <EditForm Model="CategoryForm" OnValidSubmit="SaveCategory">
+                <DataAnnotationsValidator />
+
+                <!-- NAME -->
+                <label>Name</label>
+                <InputText class="form-control"
+                           @bind-Value="CategoryForm.Name"
+                           placeholder="Category name" />
+                <ValidationMessage For="() => CategoryForm.Name" />
+
+                <!-- PARENT -->
+                <label class="mt-3">Parent Category</label>
+                <select class="form-control"
+                        @bind="CategoryForm.ParentCategoryId">
+                    <option value="">Root</option>
+                    @foreach (var cat in Categories.Where(c => c.Id != EditingCategoryId))
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+
+                <!-- DISPLAY ORDER -->
+                <label class="mt-3">Display Order</label>
+                <InputNumber class="form-control"
+                             @bind-Value="CategoryForm.DisplayOrder" />
+
+                <!-- ACTIVE -->
+                <div class="form-check mt-3">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           @bind="CategoryForm.IsActive" />
+                    <label class="form-check-label">Active</label>
+                </div>
+
+                <GlobalError Error="@_modalError" />
+
+                <div class="modal-actions">
+                    <button class="btn btn-primary" type="submit">
+                        @(IsEditMode ? "Update" : "Save")
+                    </button>
+
+                    <button class="btn btn-outline"
+                            type="button"
+                            @onclick="Cancel">
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+    //TODO: Render categories as hierarchical tree (parent → children)
+    //TODO: Add IsActive/Inactive func for categories
+
+    /* ======================
+       FORM MODEL
+    ====================== */
+
+    public class CategoryFormModel
+    {
+        [Required, MaxLength(150)]
+        public string Name { get; set; } = string.Empty;
+
+        public Guid? ParentCategoryId { get; set; }
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    /* ======================
+       STATE
+    ====================== */
+
+    private bool ShowDialog;
+    private bool IsLoading = true;
+    private bool IsEditMode;
+    private Guid EditingCategoryId;
+    private string _pageError = string.Empty;
+    private string _modalError = string.Empty;
+
+    private List<GetCategoryDTO> Categories = new();
+    private CategoryFormModel CategoryForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        IsLoading = false;
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            Categories = (await categoryService.GetAllAsync()).ToList();
+            _pageError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load categories. Please refresh.";
+            Logger.LogError(ex, "Error loading categories");
+        }
+    }
+
+    private void ShowAddCategoryDialog()
+    {
+        IsEditMode = false;
+        EditingCategoryId = Guid.Empty;
+
+        CategoryForm = new CategoryFormModel
+        {
+            DisplayOrder = Categories.Count + 1
+        };
+
+        ShowDialog = true;
+    }
+
+    private void EditCategory(GetCategoryDTO category)
+    {
+        IsEditMode = true;
+        EditingCategoryId = category.Id;
+
+        CategoryForm = new CategoryFormModel
+        {
+            Name = category.Name,
+            ParentCategoryId = category.ParentCategoryId,
+            DisplayOrder = category.DisplayOrder,
+            IsActive = category.IsActive
+        };
+
+        ShowDialog = true;
+    }
+
+    private void Cancel()
+    {
+        ShowDialog = false;
+        IsEditMode = false;
+        _modalError = string.Empty;
+        CategoryForm = new();
+    }
+
+    private async Task SaveCategory()
+    {
+        _modalError = string.Empty;
+        try
+        {
+            ClientLibrary.Models.Responses.ServiceResponse<Guid> result;
+            if (IsEditMode)
+            {
+                result = await categoryService.UpdateAsync(new UpdateCategoryDTO
+                {
+                    Id = EditingCategoryId,
+                    Name = CategoryForm.Name,
+                    ParentCategoryId = CategoryForm.ParentCategoryId,
+                    DisplayOrder = CategoryForm.DisplayOrder,
+                    IsActive = CategoryForm.IsActive
+                });
+            }
+            else
+            {
+                result = await categoryService.AddAsync(new CreateCategoryDTO
+                {
+                    Name = CategoryForm.Name,
+                    ParentCategoryId = CategoryForm.ParentCategoryId,
+                    DisplayOrder = CategoryForm.DisplayOrder
+                });
+            }
+
+            if (!result.Success)
+            {
+                _modalError = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Something went wrong. Please try again."
+                    : result.Message;
+                Logger.LogWarning("SaveCategory failed: {Message}", result.Message);
+                return;
+            }
+
+            await LoadCategories();
+            Cancel();
+        }
+        catch (Exception ex)
+        {
+            _modalError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error saving category");
+        }
+    }
+
+    private async Task DeleteCategory(Guid id)
+    {
+        if (Categories.Any(c => c.ParentCategoryId == id))
+        {
+            _pageError = "Cannot delete a category that has sub-categories.";
+            return;
+        }
+
+        try
+        {
+            _pageError = string.Empty;
+            var result = await categoryService.DeleteAsync(id);
+            if (!result.Success)
+            {
+                _pageError = result.Message ?? "Failed to delete category.";
+                Logger.LogWarning("DeleteCategory failed: {Message}", result.Message);
+                return;
+            }
+            await LoadCategories();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "An unexpected error occurred while deleting.";
+            Logger.LogError(ex, "Error deleting category {Id}", id);
+        }
+    }
+}

@@ -1,0 +1,44 @@
+<section class="category-showcase-section">
+
+    <div class="section-header">
+        <span class="section-label">@L["browse_by_category"]</span>
+        <h2 class="section-title">@L["shop_what_you_love"]</h2>
+        <p class="section-subtitle">@L["explore_collections"]</p>
+    </div>
+
+    <div class="category-pills">
+
+        @if (isLoading)
+        {
+            @for (int i = 0; i < 5; i++)
+            {
+                <span class="category-pill skeleton" style="width:100px; height:40px; border-radius:100px;"></span>
+            }
+        }
+        else
+        {
+            @foreach (var cat in Categories)
+            {
+                var catId = cat.Id;
+                <a href="@($"/category/{catId}")" class="category-pill">@cat.Name</a>
+            }
+        }
+
+    </div>
+
+</section>
+
+@code {
+    private List<GetCategoryDTO> Categories = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await categoryService.GetAllAsync();
+        Categories = result
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.DisplayOrder)
+            .ToList();
+        isLoading = false;
+    }
+}

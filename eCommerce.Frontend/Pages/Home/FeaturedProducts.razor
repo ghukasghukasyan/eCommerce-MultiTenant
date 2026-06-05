@@ -1,0 +1,102 @@
+@using ClientLibrary.Models.Orders
+@inject IJSRuntime JS
+
+<section class="featured-section">
+
+    <div class="section-header">
+        <span class="section-label">@L["hand_picked"]</span>
+        <h2 class="section-title">@Title</h2>
+        <p class="section-subtitle">@L["most_loved_subtitle"]</p>
+    </div>
+
+    <div class="featured-grid">
+        @if (isLoading)
+        {
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="product-card-modern">
+                    <div class="product-image-wrapper skeleton"></div>
+                    <div class="product-info">
+                        <div class="skeleton" style="height:16px; width:70%; margin:0 auto 8px;"></div>
+                        <div class="skeleton" style="height:12px; width:40%; margin:0 auto 14px;"></div>
+                        <div class="skeleton" style="height:38px; border-radius:100px;"></div>
+                    </div>
+                </div>
+            }
+        }
+        else if (Products.Any())
+        {
+            @foreach (var product in Products)
+            {
+                <ProductCard Product="product"
+                             OnAddToCart="@((qty) => HandleAddToCart(product, qty))" />
+            }
+        }
+        else
+        {
+            <div class="empty-state" style="grid-column: 1/-1;">
+                @L["no_featured"]
+            </div>
+        }
+    </div>
+
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Best Sellers";
+    [Parameter] public int Take { get; set; } = 4;
+
+    private List<GetProductDTO> Products = new();
+    private List<CartItemDTO> CartItems = new();
+    private bool isLoading = true;
+    private bool _isMobile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cartString = await browserCookieStorageService.GetAsync(AppConstants.Order.CartName);
+        if (!string.IsNullOrWhiteSpace(cartString))
+            CartItems = System.Text.Json.JsonSerializer.Deserialize<List<CartItemDTO>>(cartString) ?? new();
+
+        var all = await productService.GetAllAsync(1, 100);
+        Products = all.Items.Where(p => p.IsBestSeller).Take(Take).ToList();
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var width = await JS.InvokeAsync<double>("eval", "window.innerWidth");
+            _isMobile = width <= 768;
+        }
+    }
+
+    private async Task HandleAddToCart(GetProductDTO product, int quantity)
+    {
+        var existing = CartItems.FirstOrDefault(x => x.ProductId == product.Id);
+        if (existing != null)
+        {
+            existing.Quantity += quantity;
+        }
+        else
+        {
+            var defaultVariantAttrs = product.Variants?
+                .FirstOrDefault(v => v.VariantId == product.DefaultVariantId)?.Attributes;
+            CartItems.Add(new CartItemDTO
+            {
+                ProductId = product.Id,
+                VariantId = product.DefaultVariantId,
+                ProductName = product.Name,
+                UnitPrice = product.Price,
+                Quantity = quantity,
+                ImageUrl = product.Images?.FirstOrDefault(i => i.IsMain)?.ImageUrl
+                        ?? product.Images?.FirstOrDefault()?.ImageUrl,
+                VariantAttributes = defaultVariantAttrs
+            });
+        }
+
+        await CartHelper.SaveCart(CartItems);
+        CartState.SetCount(CartItems.Sum(x => x.Quantity));
+
+    }
+}

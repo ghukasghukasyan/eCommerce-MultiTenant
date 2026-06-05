@@ -1,0 +1,45 @@
+@page "/order-success/{orderId:guid}"
+@using eCommerce.Frontend.Localization
+@inject UiLocalizer L
+
+<div class="order-success-page">
+    <div class="order-success-card">
+
+        <div class="order-success-icon">
+            <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+                <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+            </svg>
+        </div>
+
+        <p class="order-success-label">@Tenant.StoreDisplayName</p>
+        <h1 class="order-success-title">@L["order_placed_successfully"]</h1>
+        <p class="order-success-sub">@L["order_confirmed_sub"]</p>
+
+        <div class="order-success-details">
+            <div class="order-detail-row">
+                <i class="fa fa-hashtag"></i>
+                <div>
+                    <span class="detail-label">@L["order_id"]</span>
+                    <span class="detail-value">@orderId.ToString()[..8].ToUpper()</span>
+                </div>
+            </div>
+            <div class="order-detail-row">
+                <i class="fa fa-truck"></i>
+                <div>
+                    <span class="detail-label">@L["pay_on_delivery"]</span>
+                </div>
+            </div>
+        </div>
+
+        <NavLink href="/" class="order-success-btn">
+            @L["back_to_shop"]
+        </NavLink>
+
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid orderId { get; set; }
+}

@@ -1,0 +1,398 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+/* ── PAGE ── */
+.user-page {
+    padding: 2rem;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── HEADER ── */
+.user-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+    .user-header h2 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.8rem;
+        font-weight: 300;
+        color: #1a1a1a;
+        margin: 0;
+    }
+
+/* ── CARD ── */
+.user-card {
+    background: #fff;
+    border: 0.5px solid #e5e5e5;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* ── EMPTY ── */
+.user-empty {
+    padding: 3rem 20px;
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+}
+
+/* ── TABLE ── */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'DM Sans', sans-serif;
+}
+
+    .user-table thead tr {
+        border-bottom: 0.5px solid #eee;
+    }
+
+    .user-table th {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #aaa;
+        font-weight: 400;
+        padding: 0 16px 12px;
+        text-align: left;
+    }
+
+    .user-table td {
+        padding: 14px 16px;
+        font-size: 13px;
+        color: #1a1a1a;
+        border-bottom: 0.5px solid #f2f2f2;
+        vertical-align: middle;
+    }
+
+    .user-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .user-table tbody tr:hover td {
+        background: #fafafa;
+    }
+
+.action-cell {
+    text-align: right;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.update-btn {
+    background: transparent;
+    border: 0.5px solid #ccc;
+    padding: 7px 16px;
+    border-radius: 100px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #555;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+    .update-btn:hover {
+        border-color: #1a1a1a;
+        color: #1a1a1a;
+    }
+
+/* ── STATUS BADGES ── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    font-family: 'DM Sans', sans-serif;
+}
+
+    .status-badge .icon {
+        font-size: 10px;
+    }
+
+    .status-badge.pending {
+        background: #fef9ec;
+        color: #92650a;
+    }
+
+    .status-badge.paid {
+        background: #eefaf3;
+        color: #1a7a42;
+    }
+
+    .status-badge.shipped {
+        background: #eef4fd;
+        color: #1a4fa0;
+    }
+
+    .status-badge.completed {
+        background: #f2f2f2;
+        color: #333;
+    }
+
+    .status-badge.cancelled {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+
+/* ── ORDER MODAL ── */
+.order-modal {
+    position: relative;
+    z-index: 5001;
+    width: 580px;
+    max-width: 92%;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 20px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.order-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem 1.75rem;
+    border-bottom: 0.5px solid #eee;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+}
+
+    .order-modal-header h3 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.4rem;
+        font-weight: 400;
+        color: #1a1a1a;
+        margin: 0 0 4px;
+    }
+
+.order-id {
+    font-size: 11px;
+    color: #aaa;
+    letter-spacing: 0.06em;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    color: #aaa;
+    transition: color 0.15s;
+    padding: 0;
+    line-height: 1;
+}
+
+    .icon-btn:hover {
+        color: #1a1a1a;
+    }
+
+/* ── ORDER SUMMARY STRIP ── */
+.order-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 0.5px solid #eee;
+}
+
+.summary-block {
+    padding: 1.25rem 1.75rem;
+    border-right: 0.5px solid #eee;
+}
+
+    .summary-block:last-child {
+        border-right: none;
+    }
+
+    .summary-block .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #aaa;
+        margin-bottom: 6px;
+    }
+
+    .summary-block .value {
+        font-size: 14px;
+        color: #1a1a1a;
+    }
+
+        .summary-block .value.total {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+
+/* ── PRODUCTS ── */
+.products-title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aaa;
+    padding: 1.25rem 1.75rem 0.75rem;
+    border-bottom: 0.5px solid #eee;
+}
+
+.products-grid {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 0.5px solid #eee;
+}
+
+.product-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 1.75rem;
+    border-bottom: 0.5px solid #f2f2f2;
+}
+
+    .product-card:last-child {
+        border-bottom: none;
+    }
+
+.product-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 0.5px solid #eee;
+    flex-shrink: 0;
+}
+
+.product-card > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+    .product-card > div > div:first-child {
+        font-size: 13px;
+        color: #1a1a1a;
+        font-weight: 500;
+    }
+
+    .product-card > div > div:not(:first-child) {
+        font-size: 12px;
+        color: #aaa;
+    }
+
+.order-item-variant {
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 0.03em;
+}
+
+/* ── SHIPPING ── */
+.shipping-section {
+    padding: 1.25rem 1.75rem 1.75rem;
+}
+
+.shipping-title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 1rem;
+}
+
+.shipping-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+    .shipping-grid > div {
+        font-size: 13px;
+        color: #555;
+        line-height: 1.5;
+    }
+
+        .shipping-grid > div b {
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+/* ── MODAL OVERLAY (shared) ── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+}
+
+@media (max-width: 768px) {
+    .user-page {
+        padding: 1rem 0.75rem;
+    }
+
+    .user-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .user-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    .order-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .shipping-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .order-modal {
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 88vh;
+        max-width: 100%;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .modal-overlay {
+        align-items: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .order-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-block {
+        border-right: none;
+        border-bottom: 0.5px solid #eee;
+        padding: 1rem 1.25rem;
+    }
+
+    .summary-block:last-child { border-bottom: none; }
+}

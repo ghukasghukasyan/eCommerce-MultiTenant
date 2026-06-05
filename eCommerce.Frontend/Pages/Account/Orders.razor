@@ -1,0 +1,281 @@
+﻿@page "/account/orders"
+@attribute [Authorize]
+@using ClientLibrary.Models.Orders
+@using ClientLibrary.Models.Responses
+@using static ClientLibrary.Enums.Statuses
+@inject IOrderService orderService
+@inject NavigationManager NavManager
+@layout Account
+
+<div class="user-page">
+
+
+    <!-- CONTENT -->
+    <div class="user-card">
+
+        @if (IsLoading)
+        {
+            <TableSkeleton Rows="5" Widths='new[]{"20%","18%","14%","14%","10%"}' />
+        }
+        else if (!OrdersList.Items.Any())
+        {
+            <div class="user-empty">
+                <p>@L["no_orders"]</p>
+            </div>
+        }
+        else
+        {
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>@L["order_num"]</th>
+                        <th>@L["date"]</th>
+                        <th>@L["status"]</th>
+                        <th>@L["total"]</th>
+                        <th class="action-cell">@L["actions"]</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var order in OrdersList.Items)
+                    {
+                        var badge = GetStatusBadge(order.Status);
+
+                        <tr>
+                            <td><b>#@order.Id.ToString().Substring(0, 8)</b></td>
+
+                            <td>@order.CreatedAt.ToString("dd MMM yyyy")</td>
+
+                            <td>
+                                <span class="status-badge @badge.css">
+                                    <span class="icon">@badge.icon</span>
+                                    @badge.text
+                                </span>
+                            </td>
+
+                            <td>@Cur.Format(order.TotalAmount)</td>
+
+                            <td class="action-cell">
+                                <div class="action-buttons">
+                                    <button class="update-btn"
+                                            @onclick="async () => await ViewOrder(order.Id)">
+                                        @L["view"]
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+    </div>
+
+</div>
+
+<!-- ================= MODAL ================= -->
+@if (IsDetailsOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-backdrop" @onclick="CloseDetails"></div>
+
+        <div class="order-modal">
+
+            @if (IsDetailsLoading)
+            {
+                <div class="skeleton-form" style="padding:1.5rem;">
+                    <div class="skeleton-cell" style="width:45%; height:18px;"></div>
+                    <div class="skeleton-cell" style="width:30%; height:12px;"></div>
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        <div class="skeleton-cell" style="width:100%; height:56px; border-radius:10px;"></div>
+                    }
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(_detailsError))
+            {
+                <div class="order-modal-header">
+                    <div></div>
+                    <button class="icon-btn" @onclick="CloseDetails">✕</button>
+                </div>
+                <div style="padding:1.5rem; text-align:center; color:#888;">@_detailsError</div>
+            }
+            else if (SelectedOrder != null)
+            {
+                <!-- HEADER -->
+                <div class="order-modal-header">
+                    <div>
+                        <h3>@L["order_label"]</h3>
+                        <div class="order-id">@SelectedOrder.OrderId</div>
+                    </div>
+                    <button class="icon-btn" @onclick="CloseDetails">✕</button>
+                </div>
+
+                <!-- SUMMARY -->
+                <div class="order-summary">
+                    <div class="summary-block">
+                        <div class="label">@L["date"]</div>
+                        <div class="value">@SelectedOrder.CreatedAt</div>
+                    </div>
+
+                    <div class="summary-block">
+                        <div class="label">@L["total"]</div>
+                        <div class="value total">@Cur.Format(SelectedOrder.TotalAmount)</div>
+                    </div>
+
+                    <div class="summary-block">
+                        <div class="label">@L["status"]</div>
+                        <div class="value">@SelectedOrder.Status</div>
+                    </div>
+                </div>
+
+                <!-- PRODUCTS -->
+                <div class="products-title">
+                    @L["products_label"] (@SelectedOrder.ItemsCount)
+                </div>
+
+                <div class="products-grid">
+                    @foreach (var item in SelectedOrder.Items)
+                    {
+                        <div class="product-card">
+                            <img src="@ResolveImage(item.ImageUrl)"
+                                 class="product-thumb"
+                                 alt="@item.ProductName" />
+
+                            <div>
+                                <div>@item.ProductName</div>
+                                @if (item.VariantAttributes?.Count > 0)
+                                {
+                                    <div class="order-item-variant">@FormatVariant(item.VariantAttributes)</div>
+                                }
+                                <div>@L["qty"]: @item.Quantity</div>
+                                <div>@Cur.Format(item.UnitPrice)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- SHIPPING -->
+                @if (SelectedOrder.ShippingDetail != null)
+                {
+                    <div class="shipping-section">
+                        <div class="shipping-title">@L["shipping_details"]</div>
+
+                        <div class="shipping-grid">
+                            <div>
+                                <b>@SelectedOrder.ShippingDetail.FullName</b>
+                            </div>
+                            <div>@SelectedOrder.ShippingDetail.PhoneNumber</div>
+                            <div>@SelectedOrder.ShippingDetail.City</div>
+                            <div>@SelectedOrder.ShippingDetail.Address</div>
+
+                            @if (!string.IsNullOrWhiteSpace(SelectedOrder.ShippingDetail.Notes))
+                            {
+                                <div>@SelectedOrder.ShippingDetail.Notes</div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+}
+
+@code {
+    private bool IsLoading = true;
+    private bool IsDetailsOpen = false;
+    private bool IsDetailsLoading = false;
+    private string _detailsError = string.Empty;
+
+    private OrderDetailDTO SelectedOrder;
+
+    private PagedResult<OrderDTO> OrdersList = new()
+    {
+        Items = new List<OrderDTO>(),
+        TotalCount = 0
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    protected async Task LoadDataAsync()
+    {
+        try
+        {
+            IsLoading = true;
+
+            OrdersList = await orderService.GetUserOrders(new OrderFilterDTO())
+                          ?? new PagedResult<OrderDTO>
+                          {
+                              Items = new List<OrderDTO>(),
+                              TotalCount = 0
+                          };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading orders: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ViewOrder(Guid id)
+    {
+        _detailsError = string.Empty;
+        IsDetailsOpen = true;
+        IsDetailsLoading = true;
+        SelectedOrder = null;
+
+        try
+        {
+            SelectedOrder = await orderService.GeUserOrdertById(id);
+            if (SelectedOrder == null)
+                _detailsError = "Order details could not be loaded.";
+        }
+        catch (Exception ex)
+        {
+            _detailsError = "Order details could not be loaded.";
+            Console.WriteLine($"Error loading order details: {ex.Message}");
+        }
+        finally
+        {
+            IsDetailsLoading = false;
+        }
+    }
+
+    private void CloseDetails()
+    {
+        IsDetailsOpen = false;
+        SelectedOrder = null;
+        _detailsError = string.Empty;
+    }
+
+    private string ResolveImage(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "/images/placeholder.png";
+        return url;
+    }
+
+    private static string FormatVariant(Dictionary<string, string> attrs) =>
+        string.Join(" · ", attrs.Select(kv => $"{kv.Key}: {kv.Value}"));
+
+    private (string icon, string text, string css) GetStatusBadge(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => ("🕒", "Pending", "pending"),
+            OrderStatus.Paid => ("✔️", "Paid", "paid"),
+            OrderStatus.Shipped => ("🚚", "Shipped", "shipped"),
+            OrderStatus.Completed => ("🏁", "Completed", "completed"),
+            OrderStatus.Cancelled => ("❌", "Cancelled", "cancelled"),
+            OrderStatus.Failed => ("⚠️", "Failed", "cancelled"),
+            _ => ("❓", "Unknown", "")
+        };
+    }
+}

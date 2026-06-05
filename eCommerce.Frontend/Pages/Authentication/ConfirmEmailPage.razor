@@ -1,0 +1,55 @@
+@page "/authentication/confirm-email"
+@layout Auth
+@attribute [AllowAnonymous]
+@inject UiLocalizer L
+
+<div class="login-page beauty">
+    <div class="login-card" style="text-align:center">
+
+        @if (_isLoading)
+        {
+            <p style="color:#888">@L.Get("loading")</p>
+        }
+        else if (_success)
+        {
+            <div style="font-size:2.5rem;margin-bottom:12px">✓</div>
+            <h2 class="login-title">@L.Get("email_confirmed_title")</h2>
+            <p style="color:#666;margin-bottom:24px">@L.Get("email_confirmed_msg")</p>
+            <a href="/authentication/login" class="btn btn-dark w-100">@L.Get("login")</a>
+        }
+        else
+        {
+            <div style="font-size:2.5rem;margin-bottom:12px">✗</div>
+            <h2 class="login-title">@L.Get("confirm_failed_title")</h2>
+            <p style="color:#888;margin-bottom:24px">@_error</p>
+            <a href="/authentication/login" class="btn btn-dark w-100">@L.Get("login")</a>
+        }
+
+    </div>
+</div>
+
+@code {
+    bool _isLoading = true;
+    bool _success;
+    string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(NavManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var userId = query["userId"];
+        var token  = query["token"];
+
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(token))
+        {
+            _error = L.Get("invalid_link");
+            _isLoading = false;
+            return;
+        }
+
+        var result = await authService.ConfirmEmail(userId, token);
+        _success = result.Success;
+        _error   = result.Message ?? L.Get("something_wrong");
+        _isLoading = false;
+    }
+}

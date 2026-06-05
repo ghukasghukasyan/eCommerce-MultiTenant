@@ -1,0 +1,62 @@
+@using ClientLibrary.Helpers.Interface
+@using eCommerce.Frontend.Layout.Main
+@using eCommerce.Frontend.Models
+@inject ILanguageService languageService
+@inject TenantConfig Tenant
+
+<PageTitle>@Tenant.StoreName</PageTitle>
+
+<HeadContent>
+    <style>
+        :root {
+            --color-primary:  @Tenant.Colors.Primary;
+            --color-accent:   @Tenant.Colors.Accent;
+            --color-soft:     @Tenant.Colors.Soft;
+            --color-bg:       @Tenant.Colors.Background;
+        }
+    </style>
+</HeadContent>
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <ErrorBoundary>
+            <ChildContent>
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                    <NotAuthorized Context="ctx">
+                        @if (ctx.User.Identity?.IsAuthenticated == true)
+                        {
+                            <LayoutView Layout="@typeof(MainLayout)">
+                                <div style="text-align:center; padding:60px 20px;">
+                                    <h3>Access Denied</h3>
+                                    <p>You don't have permission to view this page.</p>
+                                    <a href="/">Back to Home</a>
+                                </div>
+                            </LayoutView>
+                        }
+                        else
+                        {
+                            <RedirectToLogin />
+                        }
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </ChildContent>
+            <ErrorContent Context="ex">
+                <MaintenancePage Exception="@ex" />
+            </ErrorContent>
+        </ErrorBoundary>
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await languageService.InitializeAsync();
+    }
+}

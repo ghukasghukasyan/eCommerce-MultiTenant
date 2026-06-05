@@ -1,0 +1,164 @@
+﻿@page "/account/profile"
+@attribute [Authorize]
+@using ClientLibrary.Models.Users
+@inject IUserService userService
+@layout Account
+
+<div class="user-page">
+
+    <!-- CONTENT -->
+    <div class="user-card" style="padding: 2rem; max-width: 700px;">
+
+        @if (IsLoading)
+        {
+            <div class="skeleton-form">
+                <div style="display:flex; align-items:center; gap:16px; margin-bottom:8px;">
+                    <div class="skeleton-cell" style="width:64px; height:64px; border-radius:50%;"></div>
+                    <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+                        <div class="skeleton-cell" style="width:40%; height:16px;"></div>
+                        <div class="skeleton-cell" style="width:55%; height:12px;"></div>
+                    </div>
+                </div>
+                @for (int i = 0; i < 3; i++)
+                {
+                    <div class="skeleton-field">
+                        <div class="skeleton-cell" style="width:20%; height:11px;"></div>
+                        <div class="skeleton-cell" style="width:100%; height:44px;"></div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- TOP -->
+            <div class="profile-top">
+                <div class="avatar">
+                    @(UserProfile?.Name?.Length > 0
+                        ? UserProfile.Name.Substring(0, 1)
+                        : "?")
+                </div>
+
+                <div class="profile-info">
+                    <h3>@(UserProfile?.Name ?? L["unknown_user"])</h3>
+                    <p>@(UserProfile?.Email ?? "-")</p>
+                </div>
+
+                <button class="edit-btn" @onclick="ToggleEdit">
+                    @(IsEditing ? L["cancel"] : L["edit_profile"])
+                </button>
+            </div>
+
+            <!-- DETAILS -->
+            <div class="profile-details">
+
+                <div class="profile-field">
+                    <label>@L["name"]</label>
+                    @if (IsEditing)
+                    {
+                        <input @bind="UserProfile.Name" />
+                    }
+                    else
+                    {
+                        <div class="value">@UserProfile?.Name</div>
+                    }
+                </div>
+
+                <div class="profile-field">
+                    <label>@L["email"]</label>
+                    <div class="value">@UserProfile?.Email</div>
+                </div>
+
+                <div class="profile-field">
+                    <label>@L["phone"]</label>
+                    @if (IsEditing)
+                    {
+                        <input @bind="UserProfile.Phone" />
+                    }
+                    else
+                    {
+                        <div class="value">@UserProfile?.Phone</div>
+                    }
+                </div>
+
+            </div>
+
+            <!-- ACTIONS -->
+            @if (IsEditing)
+            {
+                @if (_saveError != null)
+                {
+                    <div class="alert alert-danger mt-2">@_saveError</div>
+                }
+                <div class="profile-actions">
+                    <button class="primary-btn" @onclick="SaveProfile" disabled="@IsSaving">
+                        @(IsSaving ? L["saving"] : L["save_changes"])
+                    </button>
+                </div>
+            }
+        }
+
+    </div>
+
+</div>
+
+@code {
+    private bool IsEditing = false;
+    private bool IsLoading = true;
+    private bool IsSaving = false;
+    private string? _saveError;
+
+    private UserProfileDTO UserProfile = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetProfileDTOAsync();
+    }
+
+    private async Task GetProfileDTOAsync()
+    {
+        try
+        {
+            IsLoading = true;
+
+            UserProfile = await userService.GetProfile()
+                           ?? new UserProfileDTO();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ToggleEdit()
+    {
+        IsEditing = !IsEditing;
+    }
+
+    private async Task SaveProfile()
+    {
+        _saveError = null;
+        try
+        {
+            IsSaving = true;
+
+            var result = await userService.UpdateProfile(UserProfile);
+            if (result.Success)
+                IsEditing = false;
+            else
+                _saveError = result.Message ?? "Failed to save profile.";
+        }
+        catch (Exception ex)
+        {
+            _saveError = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Error saving profile: {ex.Message}");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}

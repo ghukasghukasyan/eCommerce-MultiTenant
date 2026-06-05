@@ -1,0 +1,163 @@
+@page "/account/stats"
+@attribute [Authorize]
+@using ClientLibrary.Models.Influencers
+@using static ClientLibrary.Enums.Statuses
+@inject IInfluencerService influencerService
+@layout Account
+@attribute [Authorize(Roles = "Influencer")]
+
+<div class="user-page">
+
+    @if (_profile is not null && _profile.Status != InfluencerStatus.Approved)
+    {
+        @if (_profile.Status == InfluencerStatus.Pending)
+        {
+            <div class="inf-status-banner pending">
+                <i class="fa fa-clock"></i>
+                <div>
+                    <strong>Application under review</strong>
+                    <p>Your influencer application is being reviewed. We'll notify you once it's processed.</p>
+                </div>
+            </div>
+        }
+        else if (_profile.Status == InfluencerStatus.Rejected)
+        {
+            <div class="inf-status-banner rejected">
+                <i class="fa fa-times-circle"></i>
+                <div>
+                    <strong>Application not approved</strong>
+                    @if (!string.IsNullOrWhiteSpace(_profile.RejectionReason))
+                    {
+                        <p>@_profile.RejectionReason</p>
+                    }
+                    else
+                    {
+                        <p>Your application did not meet our current requirements. Please contact support for more details.</p>
+                    }
+                </div>
+            </div>
+        }
+        else if (_profile.Status == InfluencerStatus.Suspended)
+        {
+            <div class="inf-status-banner suspended">
+                <i class="fa fa-pause-circle"></i>
+                <div>
+                    <strong>Account suspended</strong>
+                    <p>Your influencer account has been temporarily suspended. Contact support for assistance.</p>
+                </div>
+            </div>
+        }
+    }
+
+    @if (_loading)
+    {
+        <TableSkeleton Rows="4" Widths='new[]{"25%","25%","25%","25%"}' />
+    }
+    else if (_stats is null)
+    {
+        <div class="user-card">
+            <div class="user-empty">
+                <p>Could not load stats. Please try again later.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- STAT CARDS -->
+        <div class="stats-grid">
+
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fa fa-coins"></i>
+                </div>
+                <div class="stat-body">
+                    <span class="stat-label">Total Earned</span>
+                    <span class="stat-value">@Cur.Format(_stats.TotalEarned)</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fa fa-shopping-bag"></i>
+                </div>
+                <div class="stat-body">
+                    <span class="stat-label">Orders via Coupons</span>
+                    <span class="stat-value">@_stats.TotalOrders</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fa fa-tag"></i>
+                </div>
+                <div class="stat-body">
+                    <span class="stat-label">Active Coupons</span>
+                    <span class="stat-value">@_stats.ActiveCoupons</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- PAYOUT TABLE -->
+        <div class="user-card" style="margin-top: 1.75rem;">
+
+            <div class="payout-table-header">
+                <h3>Coupon Payouts</h3>
+            </div>
+
+            @if (!_stats.Payouts.Any())
+            {
+                <div class="user-empty">
+                    <p>No coupon activity yet.</p>
+                </div>
+            }
+            else
+            {
+                <table class="user-table">
+                    <thead>
+                        <tr>
+                            <th>Coupon Code</th>
+                            <th>Commission</th>
+                            <th>Uses</th>
+                            <th>Earned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var payout in _stats.Payouts.OrderByDescending(p => p.TotalEarned))
+                        {
+                            <tr>
+                                <td><b>@payout.Code</b></td>
+                                <td>@payout.CommissionRate%</td>
+                                <td>@payout.UsedCount</td>
+                                <td>
+                                    <span class="earned-amount">@Cur.Format(payout.TotalEarned)</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+    private bool _loading = true;
+    private InfluencerStatsDTO? _stats;
+    private GetInfluencerDTO? _profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _profile = await influencerService.GetMeAsync();
+            _stats   = await influencerService.GetStatsAsync();
+        }
+        catch { }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

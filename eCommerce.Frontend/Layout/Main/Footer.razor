@@ -1,0 +1,83 @@
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+
+<footer class="site-footer">
+    <div class="footer-inner">
+
+        <!-- BRAND -->
+        <div class="footer-col footer-brand-col">
+            @if (!string.IsNullOrEmpty(Tenant.LogoUrl))
+            {
+                <img src="@Tenant.LogoUrl" alt="@Tenant.StoreName" class="footer-logo-img" />
+            }
+            else
+            {
+                <span class="footer-logo">@Tenant.StoreName</span>
+            }
+            <p>@Tenant.Tagline</p>
+            <div class="footer-social">
+                @if (!string.IsNullOrEmpty(Tenant.InstagramUrl))
+                {
+                    <a href="@Tenant.InstagramUrl" target="_blank" rel="noopener" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Tenant.TikTokUrl))
+                {
+                    <a href="@Tenant.TikTokUrl" target="_blank" rel="noopener" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Tenant.FacebookUrl))
+                {
+                    <a href="@Tenant.FacebookUrl" target="_blank" rel="noopener" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                }
+            </div>
+        </div>
+
+        <!-- SUPPORT -->
+        <div class="footer-col">
+            <h4>@L["support"]</h4>
+            <a href="tel:@Tenant.ContactPhone">@L["contact_us"]</a>
+            <a href="/privacy-policy">@L["privacy_policy"]</a>
+            <a href="/returns-refunds">@L["returns_refunds"]</a>
+        </div>
+
+        <!-- NEWSLETTER -->
+        <div class="footer-col footer-newsletter-col">
+            <h4>@L["stay_in_touch"]</h4>
+            <p>@L["newsletter_sub"]</p>
+            <div class="footer-newsletter-form">
+                <input type="email" placeholder="@L["email_placeholder"]" />
+                <button type="button" aria-label="Subscribe">
+                    <i class="fa fa-arrow-right"></i>
+                </button>
+            </div>
+            <div class="footer-phone">
+                <i class="fa fa-phone"></i>
+                <div class="footer-phone-text">
+                    <span class="footer-phone-label">@L["call_us"]</span>
+                    <a href="tel:@Tenant.ContactPhone">@Tenant.ContactPhoneDisplay</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div class="footer-bottom">
+        <span class="footer-copyright">
+            &copy; @Tenant.CopyrightYear @Tenant.StoreName &middot; @L["designed_by"] <a href="https://tickcess.com/ecommerce" target="_blank" rel="noopener">Tickcess</a>
+        </span>
+
+        @if (Tenant.FooterTrustBadges.Count > 0)
+        {
+            <div class="footer-trust">
+                @foreach (var badge in Tenant.FooterTrustBadges)
+                {
+                    <span class="footer-trust-item">
+                        <i class="@badge.Icon"></i> @badge.Label
+                    </span>
+                }
+            </div>
+        }
+    </div>
+
+</footer>

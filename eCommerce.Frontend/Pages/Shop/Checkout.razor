@@ -1,0 +1,406 @@
+@page "/checkout"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Addresses
+@using ClientLibrary.Models.Coupons
+@using ClientLibrary.Models.Orders
+@using ClientLibrary.States
+@using ClientLibrary.Enums
+@inject IUserService userService
+@inject ICouponService couponService
+
+@if (_loading)
+{
+}
+else if (!CartItems.Any())
+{
+    <div class="empty-checkout">
+        <p>Your cart is empty.</p>
+        <NavLink href="/" class="btn btn-dark">Back to shop</NavLink>
+    </div>
+}
+else
+{
+    <div class="checkout-page">
+        <p class="checkout-label">@Tenant.StoreDisplayName</p>
+        <h1 class="checkout-title">Checkout</h1>
+
+        <div class="checkout-container">
+
+            <!-- LEFT: SHIPPING -->
+            <div class="checkout-form">
+                <p class="checkout-section-title">Shipping details</p>
+
+                @if (SavedAddresses.Any())
+                {
+                    <div class="checkout-saved-addresses">
+                        <p class="saved-addresses-label">Use a saved address</p>
+                        <div class="saved-address-list">
+                            @foreach (var addr in SavedAddresses)
+                            {
+                                <div class="saved-address-option @(SelectedAddressId == addr.Id ? "selected" : "")"
+                                     @onclick="() => ApplySavedAddress(addr)">
+                                    <div class="saved-address-name">@addr.FullName</div>
+                                    <div class="saved-address-detail">@addr.City@(string.IsNullOrWhiteSpace(addr.PostalCode) ? "" : $", {addr.PostalCode}"), @addr.AddressLine</div>
+                                    <div class="saved-address-phone">@addr.PhoneNumber</div>
+                                </div>
+                            }
+                        </div>
+                        <button class="link-btn" @onclick="ClearSavedAddress">Or enter manually</button>
+                    </div>
+                }
+
+                <div class="checkout-row">
+                    <div class="checkout-field">
+                        <label>Full name</label>
+                        <input type="text" placeholder="Anna Petrosyan" @bind="Order.FullName" />
+                    </div>
+                    <div class="checkout-field">
+                        <label>Phone number</label>
+                        <input type="tel" placeholder="+374 xx xx xx xx" @bind="Order.PhoneNumber" />
+                    </div>
+                </div>
+
+                <div class="checkout-row">
+                    <div class="checkout-field">
+                        <label>City</label>
+                        <input type="text" placeholder="Yerevan" @bind="Order.City" />
+                    </div>
+                    <div class="checkout-field">
+                        <label>Postal code (optional)</label>
+                        <input type="text" placeholder="0001" @bind="Order.PostalCode" />
+                    </div>
+                </div>
+
+                <div class="checkout-row">
+                    <div class="checkout-field full">
+                        <label>Address</label>
+                        <input type="text" placeholder="Street, building" @bind="Order.Address" />
+                    </div>
+                </div>
+
+                <div class="checkout-row">
+                    <div class="checkout-field full">
+                        <label>Notes (optional)</label>
+                        <textarea placeholder="Any delivery instructions…" @bind="Order.Notes"></textarea>
+                    </div>
+                </div>
+
+                <div class="checkout-row">
+                    <div class="checkout-field full">
+                        <label>Payment method</label>
+                        <div class="payment-methods">
+                            @foreach (var method in PaymentMethods)
+                            {
+                                <label class="payment-method-option">
+                                    <input type="radio"
+                                           name="paymentMethod"
+                                           checked="@(Order.PaymentMethodId == method.Id)"
+                                           @onchange="@(() => SetPaymentMethod(method.Id))" />
+                                    <span>@method.Name</span>
+                                </label>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT: SUMMARY -->
+            <div class="checkout-right">
+                <div class="checkout-summary">
+                    <p class="checkout-section-title">Order summary</p>
+
+                    <div class="checkout-items">
+                        @foreach (var item in CartItems)
+                        {
+                            <div class="checkout-item">
+                                <div>
+                                    <div class="checkout-item-name">@item.ProductName</div>
+                                    @if (item.VariantAttributes?.Count > 0)
+                                    {
+                                        <div class="checkout-item-variant">@FormatVariant(item.VariantAttributes)</div>
+                                    }
+                                    <div class="checkout-item-qty">×@item.Quantity</div>
+                                </div>
+                                <div class="checkout-item-price">@Cur.Format(item.UnitPrice * item.Quantity)</div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- COUPON -->
+                    <div class="checkout-coupon">
+                        <div class="checkout-coupon-row">
+                            <input type="text"
+                                   class="checkout-coupon-input"
+                                   placeholder="Coupon code"
+                                   @bind="CouponCode"
+                                   @bind:event="oninput" />
+                            <button class="checkout-coupon-btn"
+                                    disabled="@IsApplyingCoupon"
+                                    @onclick="ApplyCoupon">
+                                @(IsApplyingCoupon ? "…" : "Apply")
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(CouponMessage))
+                        {
+                            <div class="checkout-coupon-msg @(AppliedCoupon != null ? "success" : "error")">
+                                @CouponMessage
+                            </div>
+                        }
+                    </div>
+
+                    @if (AppliedCoupon != null)
+                    {
+                        <div class="checkout-discount-row">
+                            <span class="checkout-total-label">Subtotal</span>
+                            <span>@Cur.Format(GetTotal())</span>
+                        </div>
+                        <div class="checkout-discount-row discount">
+                            <span class="checkout-total-label">Discount</span>
+                            <span class="discount-value">− @Cur.Format(AppliedCoupon.DiscountAmount)</span>
+                        </div>
+                    }
+
+                    <div class="checkout-total-row">
+                        <span class="checkout-total-label">Total</span>
+                        <span class="checkout-total-amount">
+                            @Cur.Format(AppliedCoupon != null ? AppliedCoupon.DiscountedTotal : GetTotal())
+                        </span>
+                    </div>
+                </div>
+
+                <div class="checkout-action-area">
+                    @if (!string.IsNullOrWhiteSpace(ValidationMessage))
+                    {
+                        <div class="checkout-validation">@ValidationMessage</div>
+                    }
+                    <button class="place-order-btn" disabled="@(IsSubmitting || !CartItems.Any())" @onclick="PlaceOrder">
+                        @(IsSubmitting ? "Placing order..." : "Place order")
+                    </button>
+                    <div class="checkout-secure">· Secure checkout ·</div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    bool _loading = true;
+
+    List<CartItemDTO> CartItems = new();
+    List<GetPaymentMethodDTO> PaymentMethods = new();
+    List<AddressDTO> SavedAddresses = new();
+
+    OrderForm Order = new();
+    bool IsSubmitting;
+    string ValidationMessage = string.Empty;
+    Guid? SelectedAddressId;
+
+    string CouponCode = string.Empty;
+    bool IsApplyingCoupon;
+    string CouponMessage = string.Empty;
+    CouponValidationResultDTO? AppliedCoupon;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cartString = await browserCookieStorageService
+            .GetAsync(AppConstants.Order.CartName);
+
+        if (!string.IsNullOrWhiteSpace(cartString))
+        {
+            CartItems = JsonSerializer.Deserialize<List<CartItemDTO>>(cartString)
+                        ?? new List<CartItemDTO>();
+        }
+
+        PaymentMethods = (await paymentMethodService.GetPaymentMethods()).ToList();
+
+        if (!PaymentMethods.Any())
+        {
+            _loading = false;
+            ValidationMessage = "No payment methods are configured. Please contact support.";
+            return;
+        }
+
+        
+
+        var cashMethod = PaymentMethods.FirstOrDefault(x => string.Equals(x.Name, "Cash", StringComparison.OrdinalIgnoreCase));
+
+        if (cashMethod != null)
+        {
+            Order.PaymentMethodId = cashMethod.Id;
+        }
+        else
+        {
+            Order.PaymentMethodId = (PaymentMethods.FirstOrDefault()?.Id).Value;
+        }
+
+        try
+        {
+            var authState = await authStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                SavedAddresses = await userService.GetUserAddresses() ?? new();
+
+                var defaultAddr = SavedAddresses.FirstOrDefault(a => a.IsDefault)
+                                  ?? SavedAddresses.FirstOrDefault();
+                if (defaultAddr != null)
+                    ApplySavedAddress(defaultAddr);
+            }
+        }
+        catch { }
+
+        _loading = false;
+    }
+
+    async Task ApplyCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(CouponCode))
+            return;
+
+        IsApplyingCoupon = true;
+        CouponMessage = string.Empty;
+        AppliedCoupon = null;
+
+        var result = await couponService.ValidateAsync(new ValidateCouponDTO
+        {
+            Code = CouponCode.Trim(),
+            OrderTotal = GetTotal()
+        });
+
+        if (result.IsValid)
+        {
+            AppliedCoupon = result;
+            CouponMessage = $"Coupon applied! You save {Cur.Format(result.DiscountAmount)}.";
+        }
+        else
+        {
+            CouponMessage = result.Message;
+        }
+
+        IsApplyingCoupon = false;
+    }
+
+    void ApplySavedAddress(AddressDTO addr)
+    {
+        SelectedAddressId = addr.Id;
+        Order.FullName = addr.FullName ?? "";
+        Order.PhoneNumber = addr.PhoneNumber ?? "";
+        Order.City = addr.City ?? "";
+        Order.Address = addr.AddressLine ?? "";
+        Order.PostalCode = addr.PostalCode ?? "";
+        Order.Notes = addr.Notes ?? "";
+    }
+
+    void ClearSavedAddress()
+    {
+        SelectedAddressId = null;
+        Order = new OrderForm { PaymentMethodId = Order.PaymentMethodId };
+    }
+
+    decimal GetTotal()
+    {
+        return CartItems.Sum(i => i.UnitPrice * i.Quantity);
+    }
+
+    async Task PlaceOrder()
+    {
+        if (IsSubmitting)
+            return;
+
+        if (string.IsNullOrWhiteSpace(Order.FullName) ||
+            string.IsNullOrWhiteSpace(Order.PhoneNumber) ||
+            string.IsNullOrWhiteSpace(Order.City) ||
+            string.IsNullOrWhiteSpace(Order.Address))
+        {
+            ValidationMessage = "Please fill in full name, phone number, city, and address.";
+            return;
+        }
+
+        if (!CartItems.Any())
+        {
+            ValidationMessage = "Your cart is empty.";
+            return;
+        }
+
+        if (Order.PaymentMethodId == Guid.Empty)
+        {
+            ValidationMessage = "Please select a payment method.";
+            return;
+        }
+
+        ValidationMessage = string.Empty;
+        IsSubmitting = true;
+
+        var createOrder = new CreateOrderDTO
+        {
+            ShippingDetail = new ShippingDetailDTO
+            {
+                FullName = Order.FullName,
+                PhoneNumber = Order.PhoneNumber,
+                City = Order.City,
+                Address = Order.Address,
+                PostalCode = Order.PostalCode,
+                Notes = Order.Notes
+            },
+
+            Items = CartItems.Select(i => new CreateOrderItemDTO
+            {
+                VariantId = i.VariantId,
+                Quantity = i.Quantity
+            }).ToList(),
+            PaymentMethodId = Order.PaymentMethodId,
+            CouponCode = AppliedCoupon != null ? CouponCode.Trim() : null
+        };
+
+        var result = await orderService.SaveOrder(createOrder);
+
+        if (!result.Success)
+        {
+            IsSubmitting = false;
+            ValidationMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? "Unable to place order. Please try again."
+                : result.Message;
+            return;
+        }
+
+        await browserCookieStorageService.RemoveAsync(AppConstants.Order.CartName);
+
+        CartState.SetCount(0);
+
+        if (IsCashPaymentMethod(Order.PaymentMethodId))
+        {
+            NavManager.NavigateTo($"/order-success/{result.Data}");
+            return;
+        }
+
+        NavManager.NavigateTo($"/payment/{result.Data}");
+    }
+
+    bool IsCashPaymentMethod(Guid paymentMethodId)
+    {
+        var paymentMethod = PaymentMethods.FirstOrDefault(x => x.Id == paymentMethodId);
+        return paymentMethod != null &&
+               string.Equals(paymentMethod.Name, "Cash", StringComparison.OrdinalIgnoreCase);
+    }
+
+    void SetPaymentMethod(Guid paymentMethodId) => Order.PaymentMethodId = paymentMethodId;
+
+    static string FormatVariant(Dictionary<string, string> attrs) =>
+        string.Join(" · ", attrs.Select(kv => $"{kv.Key}: {kv.Value}"));
+
+    class OrderForm
+    {
+        public string FullName { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string PostalCode { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public Guid PaymentMethodId { get; set; } = Guid.Empty;
+    }
+}

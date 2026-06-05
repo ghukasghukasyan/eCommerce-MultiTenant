@@ -1,0 +1,53 @@
+﻿@page "/search-result/{filter}"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@if(SearchedProducts.Any())
+{
+  <div class="container-fluid mt-5 p-3">
+                            <h1 class="fashion_taital text-light fw-bold">@L["latest_products"]</h1>
+                            <div class="fashion_section_2">
+                                <div class="row">
+                                    @foreach (var product in SearchedProducts)
+                                    {
+                                        <div class="col-lg-3 col-sm-12">
+                                            <div class="box_main">
+                                                <h4 class="shirt_text">@product.Name</h4>
+                                                @if(product.IsNew)
+                                                {
+                                                    <span id="newTag" class="badge badge-pill badge -success fs-2">@L["new_badge"]</span>
+                                                }
+                                                <p class="price_text">@L["price_label"] <span style="color: #262626;">$@product.Price</span></p>
+                                                <div class="tshirt_img"><img src="@(product.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? product.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.png")" alt="@product.Name"></div>
+                                                <div class="btn_main">
+                                                    <div class="buy_bt">
+                                                        <a href="#"><i class="fa fa-cart-plus" aria-hidden="true"></i> @L["add_to_cart"]</a>
+                                                    </div>
+
+                                                    <div class="seemore_bt">
+                                                        <a href="#">@L["see_more"]</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+}
+
+@code {
+    [Parameter] public string Filter { get; set; } = string.Empty;
+    IEnumerable<GetProductDTO> SearchedProducts = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Filter))
+        {
+            SearchedProducts = [];
+            return;
+        }
+
+        SearchedProducts = await productService.SearchAsync(Filter);
+    }
+}

@@ -1,0 +1,96 @@
+@page "/account/coupons"
+@attribute [Authorize]
+@using ClientLibrary.Models.Coupons
+@using ClientLibrary.Models.Influencers
+@using static ClientLibrary.Enums.Statuses
+@inject IInfluencerService influencerService
+@inject ICouponService couponService
+@layout Account
+@attribute [Authorize(Roles = "Influencer")]
+
+<div class="user-page">
+
+    <div class="user-card">
+
+        @if (IsLoading)
+        {
+            <TableSkeleton Rows="4" Widths='new[]{"20%","15%","15%","15%","12%","10%"}' />
+        }
+        else if (!Coupons.Any())
+        {
+            <div class="user-empty">
+                <p>@L["no_coupons"]</p>
+            </div>
+        }
+        else
+        {
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>@L["coupon_code"]</th>
+                        <th>@L["discount"]</th>
+                        <th>@L["commission"]</th>
+                        <th>@L["expiry"]</th>
+                        <th>@L["used_count"]</th>
+                        <th>@L["status"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var coupon in Coupons)
+                    {
+                        <tr>
+                            <td><b>@coupon.Code</b></td>
+                            <td>
+                                @if (coupon.DiscountType == DiscountType.Percentage)
+                                {
+                                    @($"{coupon.DiscountValue}%")
+                                }
+                                else
+                                {
+                                    @Cur.Format(coupon.DiscountValue)
+                                }
+                            </td>
+                            <td>@coupon.CommissionRate%</td>
+                            <td>
+                                @(coupon.ExpiryDate.HasValue
+                                    ? coupon.ExpiryDate.Value.ToString("dd MMM yyyy")
+                                    : L["no_expiry"])
+                            </td>
+                            <td>@coupon.UsedCount</td>
+                            <td>
+                                <span class="status-badge @(coupon.Status == ActivityStatus.Active ? "paid" : "cancelled")">
+                                    @coupon.Status
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+    </div>
+
+</div>
+
+@code {
+    private bool IsLoading = true;
+    private List<GetCouponDTO> Coupons = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var me = await influencerService.GetMeAsync();
+            if (me is not null)
+                Coupons = await couponService.GetByInfluencerAsync(me.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading coupons: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

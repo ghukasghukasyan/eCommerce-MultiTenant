@@ -1,0 +1,166 @@
+@using ClientLibrary.Models.Orders
+@inject UiOverlayState UiOverlay
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (_open)
+{
+    <div class="cart-drawer-backdrop" @onclick="Close"></div>
+
+    <div class="cart-drawer">
+
+        <!-- HEADER -->
+        <div class="cart-drawer-head">
+            <span class="cart-drawer-title">
+                @L["my_cart"]
+                @if (_items.Count > 0)
+                {
+                    <span class="cart-drawer-count">@CartState.Count</span>
+                }
+            </span>
+            <button class="cart-drawer-close" @onclick="Close">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+
+        <!-- ITEMS -->
+        <div class="cart-drawer-body">
+            @if (_loading)
+            {
+                <div class="cart-drawer-loading">
+                    <i class="fa fa-spinner fa-spin"></i>
+                </div>
+            }
+            else if (!_items.Any())
+            {
+                <div class="cart-drawer-empty">
+                    <i class="fa fa-shopping-cart"></i>
+                    <p>@L["cart_empty"]</p>
+                    <button class="cart-drawer-shop-btn" @onclick="CloseAndGoHome">
+                        @L["continue_shopping"]
+                    </button>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in _items)
+                {
+                    <div class="cart-drawer-item" @key="item.VariantId">
+                        <img src="@item.ImageUrl" class="cart-drawer-img" alt="@item.ProductName" />
+                        <div class="cart-drawer-item-info">
+                            <span class="cart-drawer-item-name">@item.ProductName</span>
+                            @if (item.VariantAttributes?.Count > 0)
+                            {
+                                <span class="cart-drawer-item-variant">
+                                    @string.Join(" · ", item.VariantAttributes.Select(kv => $"{kv.Key}: {kv.Value}"))
+                                </span>
+                            }
+                            <span class="cart-drawer-item-price">@Cur.Format(item.UnitPrice)</span>
+                        </div>
+                        <div class="cart-drawer-item-right">
+                            <div class="cart-drawer-qty">
+                                <button @onclick="() => ChangeQty(item, -1)">−</button>
+                                <span>@item.Quantity</span>
+                                <button @onclick="() => ChangeQty(item, 1)">+</button>
+                            </div>
+                            <button class="cart-drawer-remove" @onclick="() => RemoveItem(item.VariantId)">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- FOOTER -->
+        @if (_items.Any())
+        {
+            <div class="cart-drawer-foot">
+                <div class="cart-drawer-total">
+                    <span>@L["total"]</span>
+                    <span class="cart-drawer-total-amount">@Cur.Format(_items.Sum(i => i.UnitPrice * i.Quantity))</span>
+                </div>
+                <button class="cart-drawer-checkout" @onclick="CheckoutAsync">
+                    @L["proceed_to_checkout"] <i class="fa fa-chevron-right"></i>
+                </button>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    private bool _open;
+    private bool _loading;
+    private List<CartItemDTO> _items = new();
+
+    protected override void OnInitialized()
+    {
+        UiOverlay.OnCartToggleRequested += Toggle;
+        CartState.OnChange += StateHasChanged;
+    }
+
+    private void Toggle() => InvokeAsync(async () =>
+    {
+        _open = !_open;
+        await JS.InvokeVoidAsync("setBodyScroll", !_open);
+        if (_open) await LoadItems();
+        StateHasChanged();
+    });
+
+    private async Task LoadItems()
+    {
+        _loading = true;
+        StateHasChanged();
+        _items = await CartHelper.GetCart();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangeQty(CartItemDTO item, int delta)
+    {
+        var newQty = item.Quantity + delta;
+        if (newQty < 1) return;
+        item.Quantity = newQty;
+        await CartHelper.SaveCart(_items);
+        CartState.SetCount(_items.Sum(x => x.Quantity));
+        StateHasChanged();
+    }
+
+    private async Task RemoveItem(Guid variantId)
+    {
+        _items.RemoveAll(i => i.VariantId == variantId);
+        await CartHelper.SaveCart(_items);
+        CartState.SetCount(_items.Sum(x => x.Quantity));
+        StateHasChanged();
+    }
+
+    private async Task CheckoutAsync()
+    {
+        var authState = await authStateProvider.GetAuthenticationStateAsync();
+        Close();
+        if (authState.User.Identity?.IsAuthenticated == true)
+            NavManager.NavigateTo("/checkout");
+        else
+            NavManager.NavigateTo("authentication/login?returnUrl=checkout");
+    }
+
+    private void CloseAndGoHome()
+    {
+        Close();
+        NavManager.NavigateTo("/");
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _ = JS.InvokeVoidAsync("setBodyScroll", true);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        UiOverlay.OnCartToggleRequested -= Toggle;
+        CartState.OnChange -= StateHasChanged;
+    }
+}

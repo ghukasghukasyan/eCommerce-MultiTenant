@@ -1,0 +1,42 @@
+@inject IJSRuntime JS
+
+@if (_categories.Count > 0)
+{
+    <div class="cat-tab-bar">
+        <div class="cat-tab-scroll" id="cat-tab-scroll-@_scrollId">
+            @foreach (var cat in _categories)
+            {
+                var catId = cat.Id;
+                var isActive = catId == ActiveCategoryId;
+                <a href="/category/@catId"
+                   id="cat-tab-@catId"
+                   class="cat-tab @(isActive ? "active" : "")">
+                    @cat.Name
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid ActiveCategoryId { get; set; }
+
+    private List<GetCategoryDTO> _categories = new();
+    private readonly string _scrollId = Guid.NewGuid().ToString("N")[..8];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await categoryService.GetAllAsync();
+        _categories = result.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_categories.Count > 0 && ActiveCategoryId != Guid.Empty)
+        {
+            await JS.InvokeVoidAsync("scrollTabIntoView",
+                $"cat-tab-scroll-{_scrollId}",
+                $"cat-tab-{ActiveCategoryId}");
+        }
+    }
+}

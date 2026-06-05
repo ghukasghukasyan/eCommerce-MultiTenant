@@ -1,0 +1,426 @@
+﻿@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@implements IDisposable
+@inject CartState CartState
+@inject CartHelper CartHelper
+@inject ILanguageService languageService
+@inject IJSRuntime JS
+@inject UiOverlayState UiOverlay
+
+<header class="header-wrapper @(ShowShop ? "shop-open" : "")">
+    <div class="header-box">
+
+        <!-- LEFT -->
+        <div class="header-left">
+            @if (_isPwaMode && _navDepth > 0)
+            {
+                <button class="icon-btn pwa-back-btn" @onclick="GoBack" aria-label="Back">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+            }
+            <button class="burger-btn @(ShowShop ? "open" : "")"
+                    @onclick="ToggleShop"
+                    aria-label="Menu"
+                    aria-expanded="@ShowShop">
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+            </button>
+
+            <!-- MOBILE: globe icon with dropdown -->
+            <div class="pref-wrapper">
+                <button class="icon-btn pref-btn" @onclick="TogglePreferences" aria-label="Language & Currency">
+                    <i class="fa fa-globe"></i>
+                </button>
+                @if (ShowPreferences)
+                {
+                    <div class="pref-dropdown">
+                        <div class="pref-row">
+                            <span class="pref-label">@L.Get("language")</span>
+                            <select value="@languageService.CurrentLanguage" @onchange="OnLanguageChanged">
+                                <option value="en">EN</option>
+                                <option value="hy">HY</option>
+                                <option value="ru">RU</option>
+                            </select>
+                        </div>
+                        @if (Cur.SupportedCurrencies.Count > 1)
+                        {
+                            <div class="pref-row">
+                                <span class="pref-label">Currency</span>
+                                <select value="@Cur.CurrentCurrency" @onchange="OnCurrencyChanged">
+                                    @foreach (var cur in Cur.SupportedCurrencies)
+                                    {
+                                        <option value="@cur">@cur</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- CENTER -->
+        <div class="header-center">
+            <NavLink href="/" class="brand" @onclick="CloseAll">
+                @if (!string.IsNullOrEmpty(Tenant.LogoUrl))
+                {
+                    <img src="@Tenant.LogoUrl" alt="@Tenant.StoreName" class="brand-logo" />
+                }
+                else
+                {
+                    @Tenant.StoreName
+                }
+            </NavLink>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="header-right">
+
+            <!-- DESKTOP: pill selects -->
+            <select class="form-select form-select-sm me-2 lang-select" style="width:auto;" value="@languageService.CurrentLanguage" @onchange="OnLanguageChanged" aria-label="@L.Get("language")">
+                <option value="en">EN</option>
+                <option value="hy">HY</option>
+                <option value="ru">RU</option>
+            </select>
+
+            @if (Cur.SupportedCurrencies.Count > 1)
+            {
+                <select class="form-select form-select-sm me-2 currency-select" style="width:auto;" value="@Cur.CurrentCurrency" @onchange="OnCurrencyChanged" aria-label="Currency">
+                    @foreach (var cur in Cur.SupportedCurrencies)
+                    {
+                        <option value="@cur">@cur</option>
+                    }
+                </select>
+            }
+
+            <!-- SEARCH ICON -->
+            <button class="icon-btn search-icon" @onclick="ToggleSearch" aria-label="@L.Get("search_products")">
+                <i class="fa fa-search"></i>
+            </button>
+
+
+            <!-- SEARCH BAR -->
+            @if (ShowSearch)
+            {
+                <div class="search-wrapper">
+                    <div class="search-overlay-header">
+                        <span class="search-overlay-title">@L.Get("search_products")</span>
+                        <button class="icon-btn search-overlay-close" @onclick="ToggleSearch">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="search-overlay-body">
+                        <BlazoredTypeahead TItem="GetProductDTO"
+                                           TValue="GetProductDTO"
+                                           Placeholder="@L.Get("search_products")"
+                                           SearchMethod="SearchProducts"
+                                           @bind-Value="SelectedProduct"
+                                           class="search-input">
+
+                            <SelectedTemplate>
+                                @context.Name
+                            </SelectedTemplate>
+
+                            <ResultTemplate>
+                                <div class="typeahead-item">
+                                    @context.Name
+                                </div>
+                            </ResultTemplate>
+
+                            <NotFoundTemplate>
+                                <span class="text-muted px-2">@L.Get("no_products_found")</span>
+                            </NotFoundTemplate>
+
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+            }
+
+
+            <!-- CART -->
+            <button class="icon-btn cart-icon"
+                    @onclick="GoToCart"
+                    aria-label="Cart">
+                <i class="fa fa-shopping-cart"></i>
+                @if (CartState.Count > 0)
+                {
+                    <span class="cart-badge">@CartState.Count</span>
+                }
+            </button>
+
+
+            <!-- ACCOUNT -->
+            <div class="account-wrapper">
+                <button class="icon-btn" @onclick="ToggleAccountMenu">
+                    <i class="fa fa-user"></i>
+                </button>
+
+                @if (ShowAccountMenu)
+                {
+                    <div class="account-dropdown">
+                        <AuthorizeView Context="auth">
+                            <Authorized>
+                                <div class="account-user">
+                                    @L.Get("hi"), <strong>@auth.User.Identity!.Name</strong>
+                                </div>
+                                <NavLink href="account/profile">@L.Get("my_account")</NavLink>
+                                <NavLink href="/account/orders">@L.Get("orders")</NavLink>
+                                <NavLink href="authentication/logout">@L.Get("logout")</NavLink>
+                            </Authorized>
+
+                            <NotAuthorized>
+                                <NavLink href="authentication/login">@L.Get("login")</NavLink>
+                                <NavLink href="authentication/register">@L.Get("register")</NavLink>
+                            </NotAuthorized>
+                        </AuthorizeView>
+
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</header>
+
+@if (ShowShop)
+{
+    <div class="shop-overlay" @onclick="CloseAll">
+
+        <div class="shop-slide-menu" @onclick:stopPropagation>
+
+            <!-- LEFT: CATEGORIES -->
+            <div class="shop-menu">
+                @foreach (var cat in Categories)
+                {
+                    <button class="shop-category @(DefaultCategoryId == cat.Id ? "active" : "")"
+                            @onmouseover="() => PreviewCategory(cat.Id)"
+                            @onclick="() => GoToCategory(cat.Id)">
+                        <span class="shop-category-name">@cat.Name</span>
+                        <i class="fa fa-chevron-right shop-category-arrow"></i>
+                    </button>
+                }
+            </div>
+
+            <!-- RIGHT: PREVIEW PRODUCTS -->
+            <div class="shop-preview">
+                <div class="shop-preview-header">
+                    <div class="shop-preview-title">
+                        <span class="shop-preview-label">@L.Get("recommended")</span>
+                        <h3>@(Categories.FirstOrDefault(c => c.Id == DefaultCategoryId)?.Name ?? "")</h3>
+                    </div>
+                    <div class="shop-preview-actions">
+                        @if (DefaultCategoryId is not null)
+                        {
+                            <NavLink href="@($"/category/{DefaultCategoryId}")"
+                                     class="shop-view-all"
+                                     @onclick="CloseAll">
+                                @L.Get("view_all") <i class="fa fa-arrow-right"></i>
+                            </NavLink>
+                        }
+                        <button class="close-btn" @onclick="CloseAll">✕</button>
+                    </div>
+                </div>
+
+                @if (DefaultCategoryId is not null)
+                {
+                    <CategoryProducts CategoryId="DefaultCategoryId" Take="3" />
+                }
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+
+@code {
+    private bool ShowAccountMenu;
+    private bool ShowSearch;
+    private bool ShowPreferences;
+    bool ShowShop;
+    private Guid? SelectedCategoryId;
+    private string? SelectedCategoryName;
+    private List<GetCategoryDTO> Categories = new();
+    private Guid? DefaultCategoryId;
+    private GetProductDTO? _selectedProduct;
+
+    private bool _isPwaMode;
+    private int _navDepth;
+    private bool _isGoingBack;
+    private GetProductDTO? SelectedProduct
+    {
+        get => _selectedProduct;
+        set
+        {
+            if (_selectedProduct == value) return;
+            _selectedProduct = value;
+
+            if (value?.Id != null && value.Id != Guid.Empty)
+            {
+                ShowSearch = false;
+                NavManager.NavigateTo($"/product/{value.Id}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Categories = (await categoryService.GetAllAsync()).ToList();
+        await categoryService.PreloadProductsForCategoriesAsync(Categories.Select(c => c.Id).Take(3));
+        DefaultCategoryId = Categories.FirstOrDefault()?.Id;
+        CartState.OnChange += StateHasChanged;
+        NavManager.LocationChanged += OnLocationChanged;
+        UiOverlay.OnShopToggleRequested   += OnExternalShopToggle;
+        UiOverlay.OnSearchToggleRequested += OnExternalSearchToggle;
+        await CartHelper.LoadCartCount();
+    }
+
+    private void OnExternalShopToggle()   => InvokeAsync(() => { ToggleShop();   StateHasChanged(); });
+    private void OnExternalSearchToggle() => InvokeAsync(() => { ToggleSearch(); StateHasChanged(); });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isPwaMode = await JS.InvokeAsync<bool>("isPwaMode");
+            if (_isPwaMode) StateHasChanged();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (_isGoingBack)
+        {
+            _navDepth = Math.Max(0, _navDepth - 1);
+            _isGoingBack = false;
+        }
+        else
+        {
+            _navDepth++;
+        }
+
+        if (ShowShop || ShowAccountMenu || ShowSearch)
+        {
+            ShowShop = false;
+            ShowAccountMenu = false;
+            ShowSearch = false;
+            LockBodyScroll();
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task GoBack()
+    {
+        _isGoingBack = true;
+        await JS.InvokeVoidAsync("history.back");
+    }
+
+    private async Task<IEnumerable<GetProductDTO>> SearchProducts(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Enumerable.Empty<GetProductDTO>();
+
+        var results = await productService.SearchAsync(searchText);
+        return results.Take(10);
+    }
+
+    private void OnCategorySelected(Guid categoryId)
+    {
+        var cat = Categories.First(c => c.Id == categoryId);
+        SelectedCategoryId = categoryId;
+        SelectedCategoryName = cat.Name;
+    }
+
+    void GoToCategory(Guid categoryId)
+    {
+        CloseAll();
+        NavManager.NavigateTo($"/category/{categoryId}");
+    }
+
+    void PreviewCategory(Guid categoryId)
+    {
+        DefaultCategoryId = categoryId;
+    }
+
+    void CloseAll()
+    {
+        ShowSearch = false;
+        ShowAccountMenu = false;
+        ShowShop = false;
+        ShowPreferences = false;
+        _ = JS.InvokeVoidAsync("setBodyScroll", true);
+    }
+
+    void TogglePreferences()
+    {
+        var wasOpen = ShowPreferences;
+        CloseAll();
+        ShowPreferences = !wasOpen;
+    }
+
+    void ToggleSearch()
+    {
+        var opening = !ShowSearch;
+        CloseAll();
+        ShowSearch = opening;
+        if (opening) _ = JS.InvokeVoidAsync("setBodyScroll", false);
+    }
+
+    void ToggleAccountMenu()
+    {
+        CloseAll();
+        ShowAccountMenu = !ShowAccountMenu;
+    }
+
+    void ToggleShop()
+    {
+        var wasOpen = ShowShop;
+        CloseAll();
+
+        ShowShop = !wasOpen;
+
+        if (ShowShop && Categories.Any())
+        {
+            var first = Categories.First();
+            DefaultCategoryId = first.Id;
+        }
+
+        LockBodyScroll();
+    }
+
+    // Sync body overflow with shop state (prevents background scroll when shop is open)
+    private void LockBodyScroll() =>
+        _ = JS.InvokeVoidAsync("setBodyScroll", !ShowShop);
+
+    public void Dispose()
+    {
+        CartState.OnChange -= StateHasChanged;
+        NavManager.LocationChanged -= OnLocationChanged;
+        UiOverlay.OnShopToggleRequested   -= OnExternalShopToggle;
+        UiOverlay.OnSearchToggleRequested -= OnExternalSearchToggle;
+        _ = JS.InvokeVoidAsync("setBodyScroll", true);
+    }
+
+    async Task OnLanguageChanged(ChangeEventArgs e)
+    {
+        var selected = e.Value?.ToString() ?? "en";
+        await languageService.SetLanguageAsync(selected);
+        StateHasChanged();
+    }
+
+    async Task OnCurrencyChanged(ChangeEventArgs e)
+    {
+        var selected = e.Value?.ToString() ?? "AMD";
+        await Cur.SetCurrencyAsync(selected);
+        NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+    }
+
+    void GoToCart()
+    {
+        CloseAll();
+        UiOverlay.RequestCartToggle();
+    }
+
+}

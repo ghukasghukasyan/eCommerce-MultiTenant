@@ -1,0 +1,25 @@
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    var lines = Error.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+    <div class="global-error-box">
+        @if (lines.Length == 1)
+        {
+            @Error
+        }
+        else
+        {
+            <ul>
+                @foreach (var line in lines)
+                {
+                    <li>@line</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Error { get; set; }
+}

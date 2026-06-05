@@ -1,0 +1,78 @@
+@inject UiOverlayState UiOverlay
+@implements IDisposable
+
+<nav class="bottom-nav">
+
+    <NavLink href="/" class="bottom-nav-item" Match="NavLinkMatch.All">
+        <i class="fa fa-home"></i>
+        <span>@L["home"]</span>
+    </NavLink>
+
+    <button class="bottom-nav-item @(_shopActive ? "overlay-active" : "")" @onclick="ToggleShop">
+        <i class="fa fa-th-large"></i>
+        <span>@L["shop"]</span>
+    </button>
+
+    <button class="bottom-nav-item @(_searchActive ? "overlay-active" : "")" @onclick="ToggleSearch">
+        <i class="fa fa-search"></i>
+        <span>@L["search"]</span>
+    </button>
+
+    <button class="bottom-nav-item" @onclick="OpenCart">
+        <span class="bottom-nav-icon-wrap">
+            <i class="fa fa-shopping-cart"></i>
+            @if (CartState.Count > 0)
+            {
+                <span class="bottom-nav-badge">@(CartState.Count > 9 ? "9+" : CartState.Count.ToString())</span>
+            }
+        </span>
+        <span>@L["cart"]</span>
+    </button>
+
+    <NavLink href="/account/profile" class="bottom-nav-item">
+        <i class="fa fa-user"></i>
+        <span>@L["account"]</span>
+    </NavLink>
+
+</nav>
+
+@code {
+    private bool _shopActive;
+    private bool _searchActive;
+
+    protected override void OnInitialized()
+    {
+        UiOverlay.OnShopToggleRequested   += OnShopToggled;
+        UiOverlay.OnSearchToggleRequested += OnSearchToggled;
+        CartState.OnChange   += StateHasChanged;
+        NavManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnShopToggled()   => InvokeAsync(() => { _shopActive   = !_shopActive; _searchActive = false; StateHasChanged(); });
+    private void OnSearchToggled() => InvokeAsync(() => { _searchActive = !_searchActive; _shopActive = false; StateHasChanged(); });
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(() => { _shopActive = false; _searchActive = false; StateHasChanged(); });
+
+    private void ToggleShop()
+    {
+        _searchActive = false;
+        UiOverlay.RequestShopToggle();
+    }
+
+    private void ToggleSearch()
+    {
+        _shopActive = false;
+        UiOverlay.RequestSearchToggle();
+    }
+
+    private void OpenCart() => UiOverlay.RequestCartToggle();
+
+    public void Dispose()
+    {
+        UiOverlay.OnShopToggleRequested   -= OnShopToggled;
+        UiOverlay.OnSearchToggleRequested -= OnSearchToggled;
+        CartState.OnChange   -= StateHasChanged;
+        NavManager.LocationChanged -= OnLocationChanged;
+    }
+}

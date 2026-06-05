@@ -1,0 +1,148 @@
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using eCommerce.Frontend.Services
+@using Microsoft.AspNetCore.Components.Routing
+@inject OrderNotificationState NotificationState
+@implements IDisposable
+
+<!-- Mobile overlay backdrop (only rendered when drawer is open) -->
+@if (_mobileOpen)
+{
+    <div class="admin-mobile-overlay" @onclick="CloseMobileMenu"></div>
+}
+
+<!-- Floating hamburger — CSS hides it on desktop, shows it on mobile -->
+<button class="admin-hamburger" @onclick="ToggleMobileMenu" title="Menu">
+    <i class="fa fa-bars"></i>
+    @if (NotificationState.UnreadCount > 0)
+    {
+        <span class="notif-badge">@(NotificationState.UnreadCount > 99 ? "99+" : NotificationState.UnreadCount.ToString())</span>
+    }
+</button>
+
+<!-- Sidebar: fixed panel on desktop, slide-out drawer on mobile -->
+<aside class="admin-sidebar @(IsCollapsed ? "collapsed" : "") @(_mobileOpen ? "mobile-open" : "")">
+
+    <div class="sidebar-header">
+        @if (!string.IsNullOrEmpty(Tenant.LogoUrl))
+        {
+            <img src="@Tenant.LogoUrl" alt="@Tenant.StoreName" class="sidebar-logo-img" />
+        }
+        else
+        {
+            <span class="logo-text">@Tenant.StoreName</span>
+        }
+        <div class="sidebar-header-actions">
+            <button class="notif-bell-btn" @onclick="ClearNotifications" title="New orders">
+                <i class="fa fa-bell"></i>
+                @if (NotificationState.UnreadCount > 0)
+                {
+                    <span class="notif-badge">@(NotificationState.UnreadCount > 99 ? "99+" : NotificationState.UnreadCount.ToString())</span>
+                }
+            </button>
+            <button class="collapse-btn desktop-only" @onclick="ToggleSidebar">
+                <i class="fa fa-bars"></i>
+            </button>
+            <button class="collapse-btn mobile-close-btn" @onclick="CloseMobileMenu">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <nav class="sidebar-menu">
+
+        <NavLink class="menu-item" href="admin" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
+            <i class="fa fa-home"></i>
+            <span>Home</span>
+        </NavLink>
+
+        <div class="menu-group">
+            <button class="menu-item submenu-toggle" @onclick="() => ToggleSubmenu(0)">
+                <i class="fa fa-box"></i>
+                <span>Products</span>
+                <i class="fa chevron @(Submenus[0] ? "fa-chevron-up" : "fa-chevron-down")"></i>
+            </button>
+            @if (Submenus[0])
+            {
+                <NavLink class="submenu-item" href="admin/product" @onclick="CloseMobileMenu">
+                    Manage Products
+                </NavLink>
+            }
+        </div>
+
+        <div class="menu-group">
+            <button class="menu-item submenu-toggle" @onclick="() => ToggleSubmenu(1)">
+                <i class="fa fa-tags"></i>
+                <span>Categories</span>
+                <i class="fa chevron @(Submenus[1] ? "fa-chevron-up" : "fa-chevron-down")"></i>
+            </button>
+            @if (Submenus[1])
+            {
+                <NavLink class="submenu-item" href="admin/category" @onclick="CloseMobileMenu">
+                    Manage Categories
+                </NavLink>
+            }
+        </div>
+
+        <NavLink class="menu-item" href="/admin/sales" @onclick="CloseMobileMenu">
+            <i class="fa fa-chart-line"></i>
+            <span>Sales</span>
+        </NavLink>
+
+        <div class="menu-group">
+            <button class="menu-item submenu-toggle" @onclick="() => ToggleSubmenu(2)">
+                <i class="fa fa-seedling"></i>
+                <span>Growth</span>
+                <i class="fa chevron @(Submenus[2] ? "fa-chevron-up" : "fa-chevron-down")"></i>
+            </button>
+            @if (Submenus[2])
+            {
+                <NavLink class="submenu-item" href="/admin/influencers" @onclick="CloseMobileMenu">
+                    Influencers
+                </NavLink>
+                <NavLink class="submenu-item" href="/admin/coupons" @onclick="CloseMobileMenu">
+                    Coupons
+                </NavLink>
+            }
+        </div>
+
+    </nav>
+
+    <div class="sidebar-footer">
+        <NavLink class="menu-item logout" href="authentication/logout" @onclick="CloseMobileMenu">
+            <i class="fa fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </NavLink>
+    </div>
+
+</aside>
+
+@code {
+    private bool IsCollapsed;
+    private bool _mobileOpen;
+    private bool[] Submenus = new bool[5];
+
+    protected override void OnInitialized()
+    {
+        NotificationState.OnStateChanged += HandleStateChanged;
+    }
+
+    private void HandleStateChanged() => InvokeAsync(StateHasChanged);
+    private void ClearNotifications()  => NotificationState.ClearUnread();
+
+    private void ToggleSidebar()
+    {
+        IsCollapsed = !IsCollapsed;
+        if (IsCollapsed)
+            Submenus = new bool[Submenus.Length];
+    }
+
+    private void ToggleMobileMenu() => _mobileOpen = !_mobileOpen;
+    private void CloseMobileMenu()  => _mobileOpen = false;
+    private void ToggleSubmenu(int index) => Submenus[index] = !Submenus[index];
+
+    public void Dispose()
+    {
+        NotificationState.OnStateChanged -= HandleStateChanged;
+    }
+}

@@ -1,0 +1,105 @@
+﻿@page "/"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@using eCommerce.Frontend.Components
+
+@inject NavigationManager NavManager
+
+<div class="home-page">
+
+    <!-- HERO -->
+    <VideoHero />
+
+    <!-- TRUST STRIP -->
+    @if (Tenant.BrandHighlights.Any())
+    {
+        <div class="trust-strip">
+            <div class="trust-strip-inner">
+                @foreach (var item in Tenant.BrandHighlights)
+                {
+                    <div class="trust-item">
+                        <i class="@item.Icon"></i>
+                        <div>
+                            <strong>@item.Title</strong>
+                            <span>@item.Description</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- CATEGORIES -->
+    <CategoryShowcase />
+
+    <!-- FEATURED PRODUCTS -->
+    <FeaturedProducts Title="@L["best_sellers"]" Take="8" />
+
+    <!-- EDITORIAL BANNER -->
+    @{
+        var editorial = Tenant.EditorialBanner;
+    }
+    @if (!string.IsNullOrWhiteSpace(editorial.Title))
+    {
+        <div class="editorial-banner @(!string.IsNullOrEmpty(editorial.BackgroundImagePath) ? "has-bg-image" : "")"
+             style="@(!string.IsNullOrEmpty(editorial.BackgroundImagePath) ? $"background-image:url('{editorial.BackgroundImagePath}')" : "")">
+            <div class="editorial-banner-inner">
+                <span class="section-label">@editorial.Label</span>
+                <h2>@editorial.Title</h2>
+                <p>@editorial.Subtitle</p>
+                @if (_firstCategoryId.HasValue)
+                {
+                    <a href="/category/@_firstCategoryId" class="btn-editorial">
+                        @editorial.CtaLabel <i class="fa fa-arrow-right"></i>
+                    </a>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; }
+
+    private Guid? _firstCategoryId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categories = await categoryService.GetAllAsync();
+        _firstCategoryId = categories.FirstOrDefault(c => c.IsActive)?.Id;
+
+        await HandleRedirectAsync();
+    }
+
+    private async Task HandleRedirectAsync()
+    {
+        try
+        {
+            if (AuthState == null)
+                return;
+
+            var authState = await AuthState;
+            var user = authState.User;
+
+            if (user?.Identity?.IsAuthenticated != true)
+                return;
+
+            var role = user.Claims
+                .FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+
+            if (role == AppConstants.Administration.AdminRole)
+            {
+                NavManager.NavigateTo("/admin", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Home redirect error: {ex.Message}");
+        }
+    }
+}

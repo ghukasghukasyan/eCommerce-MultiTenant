@@ -1,0 +1,66 @@
+{
+  "StoreName": "GUANI",
+  "GoogleAnalyticsId": "G-462P0BMZ1G",
+  "StoreDisplayName": "Guani Cosmetics",
+  "LogoUrl": "",
+  "Tagline": "Natural beauty for every skin tone, every day.",
+  "AboutLabel": "About GUANI",
+  "ContactPhone": "+37441767667",
+  "ContactPhoneDisplay": "+374 41 76 76 67",
+  "CopyrightYear": 2026,
+  "ApiBaseUrl": "/api/",
+  "HubBaseUrl": "https://guanicosmetics.com",
+  "Colors": {
+    "Primary": "#111111",
+    "Accent": "#c4826a",
+    "Soft": "#e8d2c0",
+    "Background": "#faf9f7"
+  },
+  "FooterTrustBadges": [
+    { "Icon": "fa fa-lock",  "Label": "Secure Checkout" },
+    { "Icon": "fa fa-truck", "Label": "Fast Delivery" },
+    { "Icon": "fa fa-leaf",  "Label": "Natural Ingredients" }
+  ],
+  "BrandHighlights": [
+    { "Icon": "fa fa-leaf",       "Title": "Natural Ingredients",    "Description": "Carefully sourced botanicals and skin-loving formulas" },
+    { "Icon": "fa fa-truck",      "Title": "Fast Delivery",          "Description": "Express shipping to your door within 1–3 days" },
+    { "Icon": "fa fa-shield-alt", "Title": "Dermatologist Tested",   "Description": "Safe for all skin types, including sensitive skin" },
+    { "Icon": "fa fa-heart",      "Title": "Loved by Customers",     "Description": "Thousands of happy customers across Armenia" }
+  ],
+  "EditorialBanner": {
+    "Label": "Our Philosophy",
+    "Title": "Beauty rooted\nin nature.",
+    "Subtitle": "Every formula we craft begins with the finest natural ingredients — chosen to nourish, balance, and reveal your most radiant self.",
+    "CtaLabel": "Discover More",
+    "BackgroundImagePath": "/uploads/images/guani/editorial-bg.jpg"
+  },
+  "HeroSlides": [
+    {
+      "ImagePath": "/uploads/images/guani/slide1.png",
+      "FallbackGradient": "linear-gradient(135deg, #1a1a1a 0%, #3a2a1a 100%)",
+      "Tag": "NEW COLLECTION",
+      "Title": "Lip Essentials",
+      "Subtitle": "Glow naturally with soft, buildable tones.",
+      "CtaLabel": "Shop Now",
+      "CtaUrl": "/category/f23a45ac-9150-4aff-8687-6d58dfe359bb"
+    },
+    {
+      "ImagePath": "/uploads/images/guani/slide2.png",
+      "FallbackGradient": "linear-gradient(135deg, #2a1a2a 0%, #1a1a3a 100%)",
+      "Tag": "BEST SELLERS",
+      "Title": "Soft Glow Beauty",
+      "Subtitle": "Lightweight formulas that last all day.",
+      "CtaLabel": "Explore",
+      "CtaUrl": "/category/4fddee1f-5588-483c-a74f-33a71c98f10a"
+    },
+    {
+      "ImagePath": "/uploads/images/guani/slide3.png",
+      "FallbackGradient": "linear-gradient(135deg, #1a2a1a 0%, #2a1a1a 100%)",
+      "Tag": "LIMITED EDITION",
+      "Title": "Guani Kit",
+      "Subtitle": "Minimal makeup, maximum radiance.",
+      "CtaLabel": "Buy Now",
+      "CtaUrl": "/category/24409c52-4dea-4a3d-9aff-c1c16d1a23bc"
+    }
+  ]
+}

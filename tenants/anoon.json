@@ -1,0 +1,91 @@
+{
+  "StoreName": "ANOON",
+  "GoogleAnalyticsId": "",
+  "StoreDisplayName": "ANOON",
+  "LogoUrl": "/logos/anoon.png",
+  "Tagline": "Style built on quality.",
+  "AboutLabel": "About ANOON",
+  "ContactPhone": "+37499000000",
+  "ContactPhoneDisplay": "+374 41 01 41 97",
+  "CopyrightYear": 2026,
+  "ApiBaseUrl": "/api/",
+  "HubBaseUrl": "https://anoonclub.com",
+  "Colors": {
+    "Primary": "#341444",
+    "Accent": "#341444",
+    "Soft": "#c9a8d8",
+    "Background": "#D3D3D3"
+  },
+  "FooterTrustBadges": [
+    {
+      "Icon": "fa fa-lock",
+      "Label": "Secure Checkout"
+    },
+    {
+      "Icon": "fa fa-truck",
+      "Label": "Fast Delivery"
+    },
+    {
+      "Icon": "fa fa-redo-alt",
+      "Label": "Easy Returns"
+    }
+  ],
+  "BrandHighlights": [
+    {
+      "Icon": "fa fa-gem",
+      "Title": "Premium Quality",
+      "Description": "Carefully crafted pieces built to last season after season"
+    },
+    {
+      "Icon": "fa fa-truck",
+      "Title": "Fast Delivery",
+      "Description": "Express shipping to your door within 1–3 days"
+    },
+    {
+      "Icon": "fa fa-redo-alt",
+      "Title": "Easy Returns",
+      "Description": "Hassle-free returns within 14 days of delivery"
+    },
+    {
+      "Icon": "fa fa-heart",
+      "Title": "Loved by Customers",
+      "Description": "Thousands of happy customers across Armenia"
+    }
+  ],
+  "EditorialBanner": {
+    "Label": "Our Vision",
+    "Title": "Style built on quality.",
+    "Subtitle": "ANOON is about all of us — your journeys, your emotions, and your stories, each with its own name. Every detail, every design is created to tell your story through clothing.",
+    "CtaLabel": "Explore Collection",
+    "BackgroundImagePath": "/uploads/images/anoon/editorial-bg.jpg"
+  },
+  "HeroSlides": [
+    {
+      "ImagePath": "/uploads/images/anoon/slide1.jpg",
+      "FallbackGradient": "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+      "Tag": "NEW ARRIVALS",
+      "Title": "Spring / Summer 2025",
+      "Subtitle": "Fresh cuts and bold colors for the new season.",
+      "CtaLabel": "Shop Now",
+      "CtaUrl": "/category/00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "ImagePath": "/uploads/images/anoon/slide2.jpg",
+      "FallbackGradient": "linear-gradient(135deg, #16213e 0%, #0f3460 100%)",
+      "Tag": "BEST SELLERS",
+      "Title": "Everyday Essentials",
+      "Subtitle": "Premium basics that never go out of style.",
+      "CtaLabel": "Explore",
+      "CtaUrl": "/category/00000000-0000-0000-0000-000000000002"
+    },
+    {
+      "ImagePath": "/uploads/images/anoon/slide3.jpg",
+      "FallbackGradient": "linear-gradient(135deg, #0f3460 0%, #1a1a2e 100%)",
+      "Tag": "LIMITED DROP",
+      "Title": "Statement Pieces",
+      "Subtitle": "Stand out with this season's signature looks.",
+      "CtaLabel": "Buy Now",
+      "CtaUrl": "/category/00000000-0000-0000-0000-000000000003"
+    }
+  ]
+}

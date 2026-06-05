@@ -1,0 +1,127 @@
+ @using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Products
+
+<div class="product-card-modern" @onclick="GoToProduct">
+
+    @if (Product.IsBestSeller)
+    {
+        <div class="product-badges">
+            <span class="product-badge badge-bestseller">@L["best_sellers"]</span>
+        </div>
+    }
+
+    <div class="product-image-wrapper">
+        @if (OrderedImages.Any())
+        {
+            <div class="slider-track"
+                 style="transform: translateX(-@(_currentImageIndex * 100)%);">
+                @foreach (var img in OrderedImages)
+                {
+                    <img src="@GetImageSrc(img.ImageUrl)"
+                         class="product-image"
+                         style="object-position: @(img.ObjectPosition ?? "center")"
+                         alt="@Product.Name"
+                         loading="lazy" />
+                }
+            </div>
+
+            @if (OrderedImages.Count > 1)
+            {
+                <button class="slider-btn left" @onclick="PrevImage" @onclick:stopPropagation>‹</button>
+                <button class="slider-btn right" @onclick="NextImage" @onclick:stopPropagation>›</button>
+            }
+        }
+    </div>
+
+    <!-- Hover overlay: slides up on desktop, always visible on mobile -->
+    <div class="product-overlay">
+        <div class="overlay-info">
+            <span class="overlay-name">@Product.Name</span>
+            <span class="overlay-price">@Cur.Format(Product.Price)</span>
+            @if (Product.Variants is { Count: > 1 })
+            {
+                <span class="overlay-variants">@Product.Variants.Count variants</span>
+            }
+        </div>
+
+        @if (Product.Stock > 0)
+        {
+            @if (Product.Variants is { Count: > 1 })
+            {
+                <button class="overlay-cart-btn"
+                        title="Select options"
+                        @onclick:stopPropagation
+                        @onclick="GoToProduct">
+                    <i class="fa fa-arrow-right"></i>
+                </button>
+            }
+            else
+            {
+                <button class="overlay-cart-btn @(_added ? "added" : "")"
+                        title="@L["add_to_cart"]"
+                        @onclick="HandleAddToCart"
+                        @onclick:stopPropagation>
+                    <i class="fa @(_added ? "fa-check" : "fa-shopping-bag")"></i>
+                </button>
+            }
+        }
+        else
+        {
+            <span class="overlay-oos">@L["out_of_stock"]</span>
+        }
+    </div>
+
+</div>
+
+
+@code {
+    [Parameter] public GetProductDTO Product { get; set; } = null!;
+    [Parameter] public EventCallback<int> OnAddToCart { get; set; }
+
+    private bool _added;
+    private int _currentImageIndex = 0;
+    private List<ProductImageDTO> OrderedImages = new();
+
+    protected override void OnParametersSet()
+    {
+        OrderedImages = Product.Images?
+            .OrderByDescending(i => i.IsMain)
+            .ThenBy(i => i.DisplayOrder)
+            .ToList()
+            ?? new();
+
+        _currentImageIndex = 0;
+    }
+
+    private void NextImage()
+    {
+        if (!OrderedImages.Any()) return;
+        _currentImageIndex = (_currentImageIndex + 1) % OrderedImages.Count;
+    }
+
+    private void PrevImage()
+    {
+        if (!OrderedImages.Any()) return;
+        _currentImageIndex = (_currentImageIndex - 1 + OrderedImages.Count) % OrderedImages.Count;
+    }
+
+    private void GoToProduct() => NavManager.NavigateTo($"/product/{Product.Id}");
+
+    private async Task HandleAddToCart()
+    {
+        await OnAddToCart.InvokeAsync(1);
+        _added = true;
+        StateHasChanged();
+        await Task.Delay(1800);
+        _added = false;
+        StateHasChanged();
+    }
+
+    private static string GetImageSrc(string imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+            return "/images/placeholder.png";
+        return imageUrl;
+    }
+}

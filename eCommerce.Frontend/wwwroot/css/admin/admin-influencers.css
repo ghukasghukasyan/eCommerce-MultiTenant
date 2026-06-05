@@ -1,0 +1,452 @@
+﻿.avatar-sm {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-default {
+    background: #f0efed;
+    border: 1px solid #e8e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bbb;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+/* ── INFLUENCER STATS PAGE ── */
+.inf-stats-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid #e5e5e5;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.back-btn:hover {
+    background: #f1f3ff;
+    color: #4f46e5;
+}
+
+.inf-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.inf-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid #eee;
+}
+
+.inf-profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.inf-profile-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111;
+}
+
+.inf-profile-email {
+    font-size: 13px;
+    color: #888;
+}
+
+.inf-profile-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #555;
+    flex-wrap: wrap;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-success {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.badge-secondary {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-danger {
+    background: #fde8e8;
+    color: #c0392b;
+}
+
+.payout-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.payout-earned {
+    font-weight: 600;
+    color: #15803d;
+}
+
+/* ── INFLUENCER DETAIL GRID ── */
+.inf-detail-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    margin-top: 10px;
+}
+
+.inf-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: #555;
+}
+
+.inf-detail-item i {
+    width: 14px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+.inf-detail-item a {
+    color: #4f46e5;
+    text-decoration: none;
+}
+
+.inf-detail-item a:hover {
+    text-decoration: underline;
+}
+
+.inf-status-badge {
+    margin-left: auto;
+    align-self: flex-start;
+    white-space: nowrap;
+}
+
+/* ── KPI ALERT ── */
+.kpi-card--alert {
+    border: 1.5px solid #fed7aa;
+    background: #fffbf5;
+}
+
+/* ── MODAL SUB TEXT ── */
+.modal-sub {
+    font-size: 13px;
+    color: #888;
+    margin: 4px 0 16px;
+}
+
+.text-orange {
+    color: #ea580c;
+}
+
+.mt-3 {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #444;
+}
+
+/* ── INFLUENCER CHIP (used in coupon table) ── */
+.inf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 100px;
+    background: #f5f4f2;
+    text-decoration: none;
+    color: #111;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+    max-width: 180px;
+}
+
+.inf-chip:hover {
+    background: #eef2ff;
+    box-shadow: 0 0 0 2px #c7d2fe;
+    color: #4f46e5;
+}
+
+.inf-chip-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.inf-chip-initial {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.inf-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── SOCIAL LINKS IN TABLE ── */
+.inf-social-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inf-social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.inf-social-link.instagram {
+    background: #fce4ec;
+    color: #c2185b;
+}
+
+.inf-social-link.instagram:hover {
+    background: #c2185b;
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.inf-social-link.tiktok {
+    background: #e8f5e9;
+    color: #1a1a1a;
+}
+
+.inf-social-link.tiktok:hover {
+    background: #1a1a1a;
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.inf-no-socials {
+    color: #ccc;
+    font-size: 13px;
+}
+
+/* ── NAME / EMAIL IN TABLE ── */
+.inf-name-cell {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111;
+}
+
+.inf-email-cell {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 2px;
+}
+
+/* ── ACTION BUTTONS ── */
+.btn-approve {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.btn-approve:hover {
+    background: #15803d;
+    color: #fff;
+}
+
+.btn-reject {
+    background: #fef2f2;
+    color: #c0392b;
+    border-color: #fecaca;
+}
+
+.btn-reject:hover {
+    background: #c0392b;
+    color: #fff;
+}
+
+.btn-danger {
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #a93226;
+}
+
+.btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── HEADER ACTIONS (stats page) ── */
+.inf-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-success-outline {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-success-outline:hover {
+    background: #15803d;
+    color: #fff;
+}
+
+.btn-danger-outline {
+    background: #fef2f2;
+    color: #c0392b;
+    border: 1px solid #fecaca;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-danger-outline:hover {
+    background: #c0392b;
+    color: #fff;
+}
+
+/* ── REJECTION REASON (stats page profile card) ── */
+.inf-status-corner {
+    margin-left: auto;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 260px;
+}
+
+.inf-rejection-reason {
+    font-size: 12px;
+    color: #c0392b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 8px 12px;
+    line-height: 1.5;
+    text-align: right;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.inf-rejection-reason i {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: #e53935;
+}
+
+@media (max-width: 768px) {
+    .avatar-sm {
+        width: 30px;
+        height: 30px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .inf-profile-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .inf-status-corner {
+        margin-left: 0;
+        align-self: stretch;
+        max-width: 100%;
+        align-items: flex-start;
+    }
+
+    .inf-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .inf-stats-title {
+        flex-wrap: wrap;
+    }
+}

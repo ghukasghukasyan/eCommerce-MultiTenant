@@ -1,0 +1,17 @@
+@if (Tenant.BrandHighlights.Any())
+{
+    <section class="brand-highlights-section">
+        <div class="brand-highlights-inner">
+            @foreach (var item in Tenant.BrandHighlights)
+            {
+                <div class="brand-highlight-item">
+                    <div class="brand-highlight-icon">
+                        <i class="@item.Icon"></i>
+                    </div>
+                    <h5>@item.Title</h5>
+                    <p>@item.Description</p>
+                </div>
+            }
+        </div>
+    </section>
+}

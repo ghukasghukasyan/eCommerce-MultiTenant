@@ -1,0 +1,15 @@
+﻿@page "/authentication/logout"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Services.Interface
+@using ClientLibrary.States
+@inject IAuthenticationService authService
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await authService.LogoutAsync();
+        await tokenService.RemoveTokensAsync();
+        NavManager.NavigateTo("/", true);
+    }
+}

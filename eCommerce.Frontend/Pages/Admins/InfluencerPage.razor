@@ -1,0 +1,445 @@
+﻿@page "/admin/influencers"
+@using System.ComponentModel.DataAnnotations
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Influencers
+@using static ClientLibrary.Enums.Statuses
+@layout Admin
+@attribute [Authorize(Roles = "Admin")]
+@inject IInfluencerService influencerService
+@inject ILogger<InfluencerPage> Logger
+
+<GlobalError Error="@_pageError" />
+
+<div class="admin-page admin-influencer-page">
+
+    <!-- HEADER -->
+    <div class="admin-header">
+        <h2>Influencers</h2>
+
+        <button class="btn btn-primary"
+                @onclick="ShowAddInfluencerDialog">
+            + Add Influencer
+        </button>
+    </div>
+
+    <!-- CARD -->
+    <div class="admin-card">
+
+        @if (IsLoading)
+        {
+            <TableSkeleton Rows="5" Widths='new[]{"6%","22%","22%","12%","18%"}' />
+        }
+        else if (!Influencers.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa fa-users"></i></div>
+                <h4 class="empty-state-title">No influencers yet</h4>
+                <p class="empty-state-sub">Get started by adding your first influencer.</p>
+                <button class="btn btn-primary" @onclick="ShowAddInfluencerDialog">+ Add influencer</button>
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width:52px;"></th>
+                        <th>Name</th>
+                        <th>Socials</th>
+                        <th>Status</th>
+                        <th style="width:220px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inf in Influencers)
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(inf.AvatarUrl))
+                                {
+                                    <img src="@inf.AvatarUrl" class="avatar-sm" />
+                                }
+                                else
+                                {
+                                    <div class="avatar-sm avatar-default">
+                                        <i class="fa fa-user"></i>
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                <div class="inf-name-cell">@inf.FullName</div>
+                                <div class="inf-email-cell">@inf.Email</div>
+                            </td>
+                            <td>
+                                <div class="inf-social-links">
+                                    @if (!string.IsNullOrWhiteSpace(inf.InstagramAccountUrl))
+                                    {
+                                        <a href="@inf.InstagramAccountUrl" target="_blank"
+                                           class="inf-social-link instagram" title="Instagram">
+                                            <i class="fab fa-instagram"></i>
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(inf.TikTokAccountUrl))
+                                    {
+                                        <a href="@inf.TikTokAccountUrl" target="_blank"
+                                           class="inf-social-link tiktok" title="TikTok">
+                                            <i class="fab fa-tiktok"></i>
+                                        </a>
+                                    }
+                                    @if (string.IsNullOrWhiteSpace(inf.InstagramAccountUrl) && string.IsNullOrWhiteSpace(inf.TikTokAccountUrl))
+                                    {
+                                        <span class="inf-no-socials">—</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (inf.Status == InfluencerStatus.Approved)
+                                {
+                                    <span class="badge badge-success">Active</span>
+                                }
+                                else if (inf.Status == InfluencerStatus.Pending)
+                                {
+                                    <span class="badge badge-warning">Pending</span>
+                                }
+                                else if (inf.Status == InfluencerStatus.Rejected)
+                                {
+                                    <span class="badge badge-danger">Rejected</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Suspended</span>
+                                }
+                            </td>
+                            <td class="action-cell">
+                                <div class="action-buttons">
+                                    <button class="update-btn"
+                                            @onclick="() => GoToStats(inf.Id)">
+                                        <i class="fa fa-chart-bar"></i> Stats
+                                    </button>
+
+                                    @if (inf.Status == InfluencerStatus.Pending || inf.Status == InfluencerStatus.Rejected || inf.Status == InfluencerStatus.Suspended)
+                                    {
+                                        <button class="update-btn btn-approve"
+                                                @onclick="() => Approve(inf)">
+                                            <i class="fa fa-check"></i> Approve
+                                        </button>
+                                    }
+
+                                    @if (inf.Status != InfluencerStatus.Rejected)
+                                    {
+                                        <button class="update-btn btn-reject"
+                                                @onclick="() => OpenRejectModal(inf)">
+                                            <i class="fa fa-times"></i> Reject
+                                        </button>
+                                    }
+
+                                    @if (inf.Status == InfluencerStatus.Approved)
+                                    {
+                                        <button class="update-btn"
+                                                @onclick="() => Suspend(inf)">
+                                            <i class="fa fa-pause"></i> Suspend
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+
+    </div>
+</div>
+
+<!-- REJECT MODAL -->
+@if (ShowRejectModal)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseRejectModal">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>Reject Influencer</h4>
+            <p class="modal-sub">
+                <b>@RejectTarget?.FullName</b> — provide a reason so they understand why.
+            </p>
+
+            <label class="mt-3">Reason <span style="color:#e53935;">*</span></label>
+            <textarea class="form-control"
+                      rows="3"
+                      placeholder="e.g. Account does not meet minimum follower requirements"
+                      @bind="RejectReason"
+                      style="resize:none;"></textarea>
+
+            @if (!string.IsNullOrWhiteSpace(RejectError))
+            {
+                <div class="form-error mt-2">@RejectError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-danger" @onclick="ConfirmReject" disabled="@RejectLoading">
+                    @(RejectLoading ? "Rejecting…" : "Confirm Reject")
+                </button>
+                <button class="btn btn-outline" @onclick="CloseRejectModal">Cancel</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- ADD MODAL -->
+@if (ShowDialog)
+{
+    <div class="admin-modal-backdrop" @onclick="Cancel">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>Add Influencer</h4>
+
+            <EditForm Model="InfluencerForm" OnValidSubmit="SaveInfluencer">
+                <DataAnnotationsValidator />
+
+                <label>FullName</label>
+                <InputText class="form-control"
+                           @bind-Value="InfluencerForm.FullName" />
+                <ValidationMessage For="() => InfluencerForm.FullName" />
+
+                <label class="mt-3">Email</label>
+                <InputText class="form-control"
+                           @bind-Value="InfluencerForm.Email" />
+                <ValidationMessage For="() => InfluencerForm.Email" />
+
+                <label class="mt-3">Default Commission (%)</label>
+                <InputNumber class="form-control"
+                             @bind-Value="InfluencerForm.DefaultCommissionRate" />
+
+                @if (!string.IsNullOrWhiteSpace(ModalError))
+                {
+                    <div class="form-error">@ModalError</div>
+                }
+
+                <div class="modal-actions">
+                    <button class="btn btn-primary" type="submit">
+                        Save
+                    </button>
+
+                    <button class="btn btn-outline"
+                            type="button"
+                            @onclick="Cancel">
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    /* ======================
+       FORM MODEL
+    ====================== */
+
+    public class InfluencerFormModel
+    {
+        [Required, MaxLength(150)]
+        public string FullName { get; set; } = "";
+
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Range(0, 100)]
+        public int DefaultCommissionRate { get; set; }
+    }
+
+    /* ======================
+       STATE
+    ====================== */
+
+    private bool ShowDialog;
+    private bool IsLoading = true;
+    private string ModalError = string.Empty;
+    private string _pageError = string.Empty;
+
+    private bool ShowRejectModal;
+    private GetInfluencerDTO? RejectTarget;
+    private string RejectReason = string.Empty;
+    private string? RejectError;
+    private bool RejectLoading;
+
+    private List<GetInfluencerDTO> Influencers = new();
+    private InfluencerFormModel InfluencerForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInfluencers();
+        IsLoading = false;
+    }
+
+    private async Task LoadInfluencers()
+    {
+        try
+        {
+            Influencers = (await influencerService.GetAllAsync()).ToList();
+            _pageError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load influencers. Please refresh.";
+            Logger.LogError(ex, "Error loading influencers");
+        }
+    }
+
+    private void ShowAddInfluencerDialog()
+    {
+        InfluencerForm = new InfluencerFormModel();
+        ModalError = string.Empty;
+        ShowDialog = true;
+    }
+
+    private void Cancel()
+    {
+        ShowDialog = false;
+        ModalError = string.Empty;
+        InfluencerForm = new();
+    }
+
+    private async Task SaveInfluencer()
+    {
+        ModalError = string.Empty;
+        try
+        {
+            var result = await influencerService.CreateAsync(new CreateInfluencerDTO
+            {
+                FullName = InfluencerForm.FullName,
+                Email = InfluencerForm.Email,
+                DefaultCommissionRate = InfluencerForm.DefaultCommissionRate
+            });
+
+            if (!result.Success)
+            {
+                ModalError = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Something went wrong. Please try again."
+                    : result.Message;
+                Logger.LogWarning("SaveInfluencer failed: {Message}", result.Message);
+                return;
+            }
+
+            await LoadInfluencers();
+            Cancel();
+        }
+        catch (Exception ex)
+        {
+            ModalError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error saving influencer");
+        }
+    }
+
+    private async Task Approve(GetInfluencerDTO inf)
+    {
+        try
+        {
+            _pageError = string.Empty;
+            var result = await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+            {
+                Id = inf.Id,
+                Status = InfluencerStatus.Approved
+            });
+            if (!result.Success)
+            {
+                _pageError = result.Message ?? "Failed to approve influencer.";
+                Logger.LogWarning("Approve influencer failed for {Id}: {Message}", inf.Id, result.Message);
+                return;
+            }
+            await LoadInfluencers();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error approving influencer {Id}", inf.Id);
+        }
+    }
+
+    private async Task Suspend(GetInfluencerDTO inf)
+    {
+        try
+        {
+            _pageError = string.Empty;
+            var result = await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+            {
+                Id = inf.Id,
+                Status = InfluencerStatus.Suspended
+            });
+            if (!result.Success)
+            {
+                _pageError = result.Message ?? "Failed to suspend influencer.";
+                Logger.LogWarning("Suspend influencer failed for {Id}: {Message}", inf.Id, result.Message);
+                return;
+            }
+            await LoadInfluencers();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error suspending influencer {Id}", inf.Id);
+        }
+    }
+
+    private void OpenRejectModal(GetInfluencerDTO inf)
+    {
+        RejectTarget = inf;
+        RejectReason = string.Empty;
+        RejectError = null;
+        ShowRejectModal = true;
+    }
+
+    private void CloseRejectModal()
+    {
+        ShowRejectModal = false;
+        RejectTarget = null;
+        RejectError = null;
+    }
+
+    private async Task ConfirmReject()
+    {
+        if (string.IsNullOrWhiteSpace(RejectReason))
+        {
+            RejectError = "Please provide a rejection reason.";
+            return;
+        }
+
+        RejectLoading = true;
+        try
+        {
+            var result = await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+            {
+                Id = RejectTarget!.Id,
+                Status = InfluencerStatus.Rejected,
+                RejectionReason = RejectReason.Trim()
+            });
+
+            if (!result.Success)
+            {
+                RejectError = result.Message ?? "Failed to reject influencer.";
+                Logger.LogWarning("ConfirmReject failed for {Id}: {Message}", RejectTarget?.Id, result.Message);
+                return;
+            }
+
+            await LoadInfluencers();
+            CloseRejectModal();
+        }
+        catch (Exception ex)
+        {
+            RejectError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error rejecting influencer {Id}", RejectTarget?.Id);
+        }
+        finally
+        {
+            RejectLoading = false;
+        }
+    }
+
+    private void GoToStats(Guid id)
+        => NavManager.NavigateTo($"/admin/influencer-stats/{id}");
+}

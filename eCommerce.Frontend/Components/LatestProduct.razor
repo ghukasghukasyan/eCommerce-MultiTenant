@@ -1,0 +1,90 @@
+﻿@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Orders
+@using ClientLibrary.States
+@implements IAsyncDisposable
+
+<div class="fashion_section container-fluid">
+    <div id="main_slider" class="carousel slide" data-ride="carousel">
+        <div class="carousel-inner">
+            @if (ProductGroups.Any())
+            {
+                int sn = 1;
+                @foreach (var group in ProductGroups)
+                {
+                    <div class="carousel-item @(sn == 1 ? "active" : null)">
+                        <div class="container-fluid">
+                            <h1 class="fashion_taital text-light fw-bold">@L["latest_products"]</h1>
+
+                            <div class="fashion_section_2">
+                                <div class="row">
+                                    @foreach (var product in group)
+                                    {
+                                        <div class="col-lg-3 col-sm-12">
+                                            <div class="box_main">
+                                                <h4 class="shirt_text">@product.Name</h4>
+                                                <span id="newTag" class="badge bg-success fs-5">@L["new_badge"]</span>
+                                                <p class="price_text">@L["price_label"] <span style="color: #262626;">$@product.Price</span></p>
+                                                <div class="btn_main">
+                                                    <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
+                                                        <i class="fa fa-cart-plus" aria-hidden="true"></i>
+                                                            @L["add_to_cart"]
+                                                    </div>
+                                                    <div class="seemore_bt">
+                                                        <a href="#">@L["see_more"]</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    sn++;
+                }
+            }
+        </div>
+
+        @if (Products.Any())
+        {
+            <a class="carousel-control-prev" href="#main_slider" role="button" data-slide="prev">
+                <i class="fa fa-angle-left"></i>
+            </a>
+            <a class="carousel-control-next" href="#main_slider" role="button" data-slide="next">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        }
+    </div>
+</div>
+
+@code {
+    IEnumerable<GetProductDTO> Products = [];
+    List<List<GetProductDTO>> ProductGroups = [];
+    List<CartItemDTO> MyCarts = [];
+
+    protected async override Task OnInitializedAsync()
+    {
+        Products = await productService.GetRecentAsync();
+        ProductGroups = Products
+            .Select((product, index) => new { product, index })
+            .GroupBy(x => x.index / 4)
+            .Select(g => g.Select(x => x.product).ToList())
+            .ToList();
+    }
+
+    async Task AddItemToCart(Guid productId)
+    {
+        var getCart = MyCarts.FirstOrDefault(x => x.ProductId == productId);
+        if (getCart == null)
+            MyCarts.Add(new CartItemDTO { ProductId = productId, Quantity = 1 });
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (MyCarts.Any())
+        {
+            await browserCookieStorageService.
+            SetAsync(AppConstants.Order.CartName, JsonSerializer.Serialize(MyCarts), 30, "/");
+        }
+    }
+}

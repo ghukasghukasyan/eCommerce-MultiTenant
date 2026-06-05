@@ -1,0 +1,457 @@
+@page "/admin/influencer-stats/{InfluencerId:guid}"
+@using ClientLibrary.Models.Influencers
+@using static ClientLibrary.Enums.Statuses
+@layout Admin
+@attribute [Authorize(Roles = "Admin")]
+@inject IInfluencerService influencerService
+
+<div class="admin-page">
+
+    <!-- HEADER -->
+    <div class="admin-header">
+        <div class="inf-stats-title">
+            <button class="back-btn" @onclick='() => NavManager.NavigateTo("/admin/influencers")'>
+                <i class="fa fa-arrow-left"></i>
+            </button>
+            <h2>@(_influencer?.FullName ?? "Influencer")</h2>
+        </div>
+        @if (_influencer is not null)
+        {
+            <div class="inf-header-actions">
+                @if (_influencer.Status != InfluencerStatus.Approved)
+                {
+                    <button class="btn btn-success-outline" @onclick="ApproveInfluencer" disabled="@_actionLoading">
+                        <i class="fa fa-check"></i> @(_actionLoading ? "…" : "Approve")
+                    </button>
+                }
+                @if (_influencer.Status != InfluencerStatus.Rejected)
+                {
+                    <button class="btn btn-danger-outline" @onclick="OpenRejectModal" disabled="@_actionLoading">
+                        <i class="fa fa-times"></i> Reject
+                    </button>
+                }
+                @if (_influencer.Status == InfluencerStatus.Approved)
+                {
+                    <button class="btn btn-outline" @onclick="SuspendInfluencer" disabled="@_actionLoading">
+                        <i class="fa fa-pause"></i> @(_actionLoading ? "…" : "Suspend")
+                    </button>
+                }
+                <button class="btn btn-primary" @onclick="OpenPayoutModal">
+                    <i class="fa fa-money-bill-wave"></i> Record Payout
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <TableSkeleton Rows="5" Widths='new[]{"25%","25%","25%","25%"}' />
+    }
+    else if (_influencer is null || _stats is null)
+    {
+        <div class="admin-card">
+            <div class="admin-empty">Influencer not found.</div>
+        </div>
+    }
+    else
+    {
+        <!-- PROFILE CARD -->
+        <div class="admin-card inf-profile-card">
+            <img src="@GetAvatar()" class="inf-avatar" />
+
+            <div class="inf-profile-info">
+                <div class="inf-profile-name">@_influencer.FullName</div>
+                <div class="inf-profile-email">@_influencer.Email</div>
+
+                <div class="inf-detail-grid">
+                    @if (!string.IsNullOrWhiteSpace(_influencer.PhoneNumber))
+                    {
+                        <div class="inf-detail-item">
+                            <i class="fa fa-phone"></i>
+                            <span>@_influencer.PhoneNumber</span>
+                        </div>
+                    }
+                    <div class="inf-detail-item">
+                        <i class="fa fa-percent"></i>
+                        <span>Default commission: <b>@_influencer.DefaultCommissionRate%</b></span>
+                    </div>
+                    <div class="inf-detail-item">
+                        <i class="fa fa-calendar-alt"></i>
+                        <span>Joined @_influencer.RegisteredAt.ToString("dd MMM yyyy")</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_influencer.InstagramAccountUrl))
+                    {
+                        <div class="inf-detail-item">
+                            <i class="fab fa-instagram"></i>
+                            <a href="@_influencer.InstagramAccountUrl" target="_blank">Instagram</a>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_influencer.TikTokAccountUrl))
+                    {
+                        <div class="inf-detail-item">
+                            <i class="fab fa-tiktok"></i>
+                            <a href="@_influencer.TikTokAccountUrl" target="_blank">TikTok</a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="inf-status-corner">
+                <span class="badge @StatusBadgeClass(_influencer.Status) inf-status-badge">
+                    @StatusLabel(_influencer.Status)
+                </span>
+                @if (_influencer.Status == InfluencerStatus.Rejected && !string.IsNullOrWhiteSpace(_influencer.RejectionReason))
+                {
+                    <div class="inf-rejection-reason">
+                        <i class="fa fa-exclamation-circle"></i>
+                        @_influencer.RejectionReason
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- KPI CARDS -->
+        <div class="kpi-grid" style="margin-top:20px;">
+
+            <div class="kpi-card">
+                <div class="kpi-icon gold">
+                    <i class="fa fa-coins" style="color:#c9a96e;"></i>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Total Earned</span>
+                    <span class="kpi-value">@Cur.Format(_stats.TotalEarned)</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon green">
+                    <i class="fa fa-check-circle" style="color:#16a34a;"></i>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Total Paid Out</span>
+                    <span class="kpi-value">@Cur.Format(_stats.TotalPaid)</span>
+                </div>
+            </div>
+
+            <div class="kpi-card @(_stats.PendingBalance > 0 ? "kpi-card--alert" : "")">
+                <div class="kpi-icon orange">
+                    <i class="fa fa-clock" style="color:#ea580c;"></i>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Pending Balance</span>
+                    <span class="kpi-value">@Cur.Format(_stats.PendingBalance)</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon blue">
+                    <i class="fa fa-shopping-bag" style="color:#4f46e5;"></i>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Orders via Coupons</span>
+                    <span class="kpi-value">@_stats.TotalOrders</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COUPON EARNINGS TABLE -->
+        <div class="admin-card" style="margin-top:20px;">
+            <h3 class="payout-section-title">Coupon Earnings</h3>
+
+            @if (!_stats.Payouts.Any())
+            {
+                <div class="admin-empty">No coupon activity yet.</div>
+            }
+            else
+            {
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Coupon Code</th>
+                            <th>Commission</th>
+                            <th>Uses</th>
+                            <th>Earned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _stats.Payouts.OrderByDescending(x => x.TotalEarned))
+                        {
+                            <tr>
+                                <td><b>@p.Code</b></td>
+                                <td>@p.CommissionRate%</td>
+                                <td>@p.UsedCount</td>
+                                <td><span class="payout-earned">@Cur.Format(p.TotalEarned)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- PAYOUT HISTORY TABLE -->
+        <div class="admin-card" style="margin-top:20px;">
+            <h3 class="payout-section-title">Payout History</h3>
+
+            @if (!_stats.PayoutHistory.Any())
+            {
+                <div class="admin-empty">No payouts recorded yet.</div>
+            }
+            else
+            {
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var h in _stats.PayoutHistory)
+                        {
+                            <tr>
+                                <td>@h.PaidAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                                <td><span class="payout-earned">@Cur.Format(h.Amount)</span></td>
+                                <td>@(string.IsNullOrWhiteSpace(h.Note) ? "—" : h.Note)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+
+</div>
+
+<!-- REJECT MODAL -->
+@if (_showRejectModal)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseRejectModal">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>Reject Influencer</h4>
+            <p class="modal-sub">Provide a reason — the influencer will see this message.</p>
+
+            <label class="mt-3">Reason <span style="color:#e53935;">*</span></label>
+            <textarea class="form-control"
+                      rows="3"
+                      placeholder="e.g. Account does not meet minimum follower requirements"
+                      @bind="_rejectReason"
+                      style="resize:none;"></textarea>
+
+            @if (!string.IsNullOrWhiteSpace(_rejectError))
+            {
+                <div class="form-error mt-2">@_rejectError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-danger" @onclick="ConfirmReject" disabled="@_rejectLoading">
+                    @(_rejectLoading ? "Rejecting…" : "Confirm Reject")
+                </button>
+                <button class="btn btn-outline" @onclick="CloseRejectModal">Cancel</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- RECORD PAYOUT MODAL -->
+@if (_showPayoutModal)
+{
+    <div class="admin-modal-backdrop" @onclick="ClosePayoutModal">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>Record Payout</h4>
+            <p class="modal-sub">
+                Pending balance:
+                <b class="@(_stats!.PendingBalance > 0 ? "text-orange" : "")">
+                    @Cur.Format(_stats!.PendingBalance)
+                </b>
+            </p>
+
+            <label class="mt-3">Amount (@Tenant.Currency)</label>
+            <input type="number" class="form-control" min="1"
+                   @bind="_payoutAmount" placeholder="e.g. 5000" />
+
+            <label class="mt-3">Note (optional)</label>
+            <input type="text" class="form-control"
+                   @bind="_payoutNote" placeholder="e.g. April commission" />
+
+            @if (!string.IsNullOrWhiteSpace(_payoutError))
+            {
+                <div class="form-error mt-2">@_payoutError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-primary" @onclick="SubmitPayout" disabled="@_payoutLoading">
+                    @(_payoutLoading ? "Saving…" : "Record")
+                </button>
+                <button class="btn btn-outline" @onclick="ClosePayoutModal">Cancel</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid InfluencerId { get; set; }
+
+    private bool _loading = true;
+    private GetInfluencerDTO? _influencer;
+    private InfluencerStatsDTO? _stats;
+
+    private bool _showPayoutModal;
+    private decimal _payoutAmount;
+    private string? _payoutNote;
+    private string? _payoutError;
+    private bool _payoutLoading;
+
+    private bool _actionLoading;
+
+    private bool _showRejectModal;
+    private string _rejectReason = string.Empty;
+    private string? _rejectError;
+    private bool _rejectLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _influencer = await influencerService.GetByIdAsync(InfluencerId);
+            _stats = await influencerService.GetStatsByIdAsync(InfluencerId);
+        }
+        catch { }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenPayoutModal()
+    {
+        _payoutAmount = _stats?.PendingBalance > 0 ? _stats.PendingBalance : 0;
+        _payoutNote = null;
+        _payoutError = null;
+        _showPayoutModal = true;
+    }
+
+    private void ClosePayoutModal()
+    {
+        _showPayoutModal = false;
+        _payoutError = null;
+    }
+
+    private async Task SubmitPayout()
+    {
+        _payoutError = null;
+
+        if (_payoutAmount <= 0)
+        {
+            _payoutError = "Amount must be greater than zero.";
+            return;
+        }
+
+        _payoutLoading = true;
+        var result = await influencerService.RecordPayoutAsync(InfluencerId, _payoutAmount, _payoutNote);
+        _payoutLoading = false;
+
+        if (!result.Success)
+        {
+            _payoutError = result.Message ?? "Something went wrong.";
+            return;
+        }
+
+        ClosePayoutModal();
+        _loading = true;
+        await LoadAsync();
+    }
+
+    private string GetAvatar()
+        => string.IsNullOrEmpty(_influencer?.AvatarUrl)
+            ? "/images/avatar-placeholder.png"
+            : _influencer.AvatarUrl;
+
+    private static string StatusBadgeClass(InfluencerStatus s) => s switch
+    {
+        InfluencerStatus.Approved  => "badge-success",
+        InfluencerStatus.Pending   => "badge-warning",
+        InfluencerStatus.Rejected  => "badge-danger",
+        _                          => "badge-secondary"
+    };
+
+    private static string StatusLabel(InfluencerStatus s) => s switch
+    {
+        InfluencerStatus.Approved  => "Active",
+        InfluencerStatus.Pending   => "Pending",
+        InfluencerStatus.Rejected  => "Rejected",
+        InfluencerStatus.Suspended => "Suspended",
+        _                          => s.ToString()
+    };
+
+    private async Task ApproveInfluencer()
+    {
+        if (_actionLoading) return;
+        _actionLoading = true;
+        await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+        {
+            Id = InfluencerId,
+            Status = InfluencerStatus.Approved
+        });
+        _actionLoading = false;
+        await LoadAsync();
+    }
+
+    private async Task SuspendInfluencer()
+    {
+        if (_actionLoading) return;
+        _actionLoading = true;
+        await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+        {
+            Id = InfluencerId,
+            Status = InfluencerStatus.Suspended
+        });
+        _actionLoading = false;
+        await LoadAsync();
+    }
+
+    private void OpenRejectModal()
+    {
+        _rejectReason = string.Empty;
+        _rejectError = null;
+        _showRejectModal = true;
+    }
+
+    private void CloseRejectModal()
+    {
+        _showRejectModal = false;
+        _rejectError = null;
+    }
+
+    private async Task ConfirmReject()
+    {
+        if (string.IsNullOrWhiteSpace(_rejectReason))
+        {
+            _rejectError = "Please provide a rejection reason.";
+            return;
+        }
+
+        _rejectLoading = true;
+        await influencerService.UpdateStatusAsync(new UpdateInfluencerStatusDTO
+        {
+            Id = InfluencerId,
+            Status = InfluencerStatus.Rejected,
+            RejectionReason = _rejectReason.Trim()
+        });
+        _rejectLoading = false;
+
+        CloseRejectModal();
+        _loading = true;
+        await LoadAsync();
+    }
+}

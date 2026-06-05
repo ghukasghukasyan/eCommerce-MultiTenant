@@ -1,0 +1,10 @@
+﻿using Microsoft.AspNetCore.Http;
+
+namespace eCommerce.Application.DTOs.Products
+{
+    public class UploadImageDTO
+    {
+        public IFormFile File { get; set; }
+        public Guid ProductId { get; set; }
+    }
+}

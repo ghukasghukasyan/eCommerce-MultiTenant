@@ -1,0 +1,46 @@
+@page "/category/{CategoryId:guid}"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+
+<CategoryTabBar ActiveCategoryId="CategoryId" />
+
+<div class="category-page">
+
+    <!-- HERO -->
+    <section class="category-hero">
+        <h1>
+            @if (isLoading)
+            {
+                <span class="skeleton-title"></span>
+            }
+            else
+            {
+                @_categoryName
+            }
+        </h1>
+    </section>
+
+    <!-- PRODUCTS -->
+    <section class="category-products">
+        <CategoryProducts CategoryId="CategoryId" Take="999" ShowSortBar="true" />
+    </section>
+
+</div>
+
+@code {
+    [Parameter] public Guid CategoryId { get; set; }
+    bool isLoading = true;
+
+    private string _categoryName = "Category";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+
+        var category = await categoryService.GetByIdAsync(CategoryId);
+        _categoryName = category?.Name ?? "Category";
+
+        isLoading = false;
+    }
+}

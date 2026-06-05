@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15
+    ports:
+      - "127.0.0.1:5432:5432"
+    container_name: ecommerce-db
+    restart: always
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: StrongPassword123!
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: eCommerce.Api/Dockerfile
+    container_name: ecommerce-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "80"
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:80
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__ECommerce: Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Password=StrongPassword123!
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__ExpiryHours: ${JWT_EXPIRY_HOURS:-2}
+      Frontend__BaseUrl: ${FRONTEND_BASE_URL}
+    volumes:
+      - uploads-data:/app/wwwroot/uploads
+      - ./slides:/app/wwwroot/uploads/images:ro
+      - ./tenants/${TENANT:-guani}.json:/app/tenant.json:ro
+
+  frontend:
+    build:
+      context: .
+      dockerfile: eCommerce.Frontend/Dockerfile
+    container_name: ecommerce-frontend
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    volumes:
+      - ./tenants/${TENANT:-guani}.json:/usr/share/nginx/html/tenant.json:ro
+      - ./tenants/favicons/${TENANT:-guani}.ico:/usr/share/nginx/html/favicon.ico:ro
+      - ./tenants/logos:/usr/share/nginx/html/logos:ro
+
+volumes:
+  postgres-data:
+  uploads-data:

@@ -1,0 +1,83 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using System.Linq.Expressions
+
+<div class="app-input">
+
+    <div class="input-wrapper @(HasError ? "has-error" : "")">
+
+        <input type="@_resolvedType"
+               value="@Value"
+               @oninput="OnInput"
+               placeholder=" " />
+
+        <label>@Label</label>
+
+        @if (Type == "password")
+        {
+            <button type="button" class="eye-toggle" @onclick="ToggleVisibility" tabindex="-1">
+                <i class="fa @(_showPassword ? "fa-eye-slash" : "fa-eye")"></i>
+            </button>
+        }
+
+    </div>
+
+    @if (HasError)
+    {
+        <div class="error-text">@ErrorMessage</div>
+    }
+
+</div>
+
+@code {
+    [CascadingParameter] private EditContext EditContext { get; set; }
+
+    [Parameter] public string Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    // 🔥 IMPORTANT: nullable (because @bind already provides it internally)
+    [Parameter] public Expression<Func<string>>? ValueExpression { get; set; }
+
+    [Parameter] public string Label { get; set; }
+    [Parameter] public string Type { get; set; } = "text";
+
+    private bool _showPassword;
+    private string _resolvedType => Type == "password" && _showPassword ? "text" : Type;
+
+    private void ToggleVisibility() => _showPassword = !_showPassword;
+
+    private FieldIdentifier _field;
+    private string ErrorMessage;
+
+    bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    protected override void OnInitialized()
+    {
+        if (EditContext == null)
+            throw new InvalidOperationException("AppInput requires EditContext.");
+
+        if (ValueExpression != null)
+        {
+            _field = FieldIdentifier.Create(ValueExpression);
+        }
+
+        EditContext.OnValidationStateChanged += (_, __) =>
+        {
+            if (ValueExpression != null)
+            {
+                ErrorMessage = EditContext.GetValidationMessages(_field).FirstOrDefault();
+                StateHasChanged();
+            }
+        };
+    }
+
+    async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+
+        if (ValueExpression != null)
+        {
+            EditContext.NotifyFieldChanged(_field);
+        }
+    }
+}

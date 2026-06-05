@@ -1,0 +1,24 @@
+﻿using eCommerce.Application.DTOs.Products;
+using FluentValidation;
+
+namespace eCommerce.Application.Validations.Products
+{
+    public class CreateProductValidator : AbstractValidator<CreateProductDTO>
+    {
+        public CreateProductValidator()
+        {
+            RuleFor(p => p.Name)
+                .NotEmpty().WithMessage("Product name is required.")
+                .MaximumLength(200).WithMessage("Product name must not exceed 200 characters.");
+
+            RuleFor(p => p.CategoryId)
+                .NotEmpty().WithMessage("Category is required.");
+
+            RuleFor(p => p.InitialPrice)
+                .GreaterThan(0).WithMessage("Price must be greater than zero.");
+
+            RuleFor(p => p.InitialStock)
+                .GreaterThanOrEqualTo(0).WithMessage("Stock cannot be negative.");
+        }
+    }
+}

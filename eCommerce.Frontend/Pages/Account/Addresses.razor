@@ -1,0 +1,301 @@
+﻿@page "/account/addresses"
+@attribute [Authorize]
+@using ClientLibrary.Models.Addresses
+@inject IUserService addressService
+@layout Account
+
+<div class="user-page">
+
+    <!-- ADD BUTTON: always visible, single source of truth -->
+    <div class="address-action-bar">
+        <button class="primary-btn" @onclick="OpenCreate">@L["add_address"]</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="user-card">
+
+        @if (IsLoading)
+        {
+            <div class="address-grid">
+                @for (int i = 0; i < 3; i++)
+                {
+                    <div class="skeleton-card">
+                        <div class="skeleton-cell" style="width:55%; height:15px; margin-bottom:4px;"></div>
+                        <div class="skeleton-cell" style="width:35%; height:12px;"></div>
+                        <div class="skeleton-cell" style="width:70%; height:12px; margin-top:10px;"></div>
+                        <div class="skeleton-cell" style="width:50%; height:12px;"></div>
+                    </div>
+                }
+            </div>
+        }
+        else if (!UserAddresses.Any())
+        {
+            <div class="user-empty">@L["no_addresses"]</div>
+        }
+        else
+        {
+            <div class="address-grid">
+                @foreach (var addr in UserAddresses)
+                {
+                    <div class="address-card @(addr.IsDefault ? "default" : "")">
+
+                        <!-- HEADER -->
+                        <div class="address-header">
+                            <div>
+                                <div class="name">@addr.FullName</div>
+                                <div class="phone">@addr.PhoneNumber</div>
+                            </div>
+
+                            @if (addr.IsDefault)
+                            {
+                                <span class="badge">@L["default_badge"]</span>
+                            }
+                        </div>
+
+                        <!-- BODY -->
+                        <div class="address-body">
+                            <div>@addr.City@(string.IsNullOrWhiteSpace(addr.PostalCode) ? "" : $", {addr.PostalCode}")</div>
+                            <div>@addr.AddressLine</div>
+
+                            @if (!string.IsNullOrWhiteSpace(addr.Notes))
+                            {
+                                <div class="notes">@addr.Notes</div>
+                            }
+                        </div>
+
+                        <!-- ACTIONS -->
+                        <div class="address-actions">
+                            <button class="link-btn" @onclick="() => Edit(addr)">@L["edit"]</button>
+                            <button class="link-btn danger" @onclick="() => Delete(addr.Id)">@L["delete"]</button>
+
+                            @if (!addr.IsDefault)
+                            {
+                                <button class="link-btn primary" @onclick="() => SetDefault(addr)">
+                                    @L["set_default"]
+                                </button>
+                            }
+                        </div>
+
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+
+</div>
+
+<!-- MODAL -->
+@if (IsModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-backdrop" @onclick="CloseModal"></div>
+
+        <div class="modal">
+
+            <!-- HEADER -->
+            <div class="modal-header">
+                <h3>@(IsEdit ? L["edit_address"] : L["add_address_title"])</h3>
+                <button class="close-btn" @onclick="CloseModal">✕</button>
+            </div>
+
+            <!-- BODY -->
+            <div class="modal-body">
+
+                <div class="form-grid">
+
+                    <input placeholder="@L["full_name"]"
+                           value="@(IsEdit? UpdateModel.FullName: Model.FullName)"
+                           @oninput="e => {
+                                               if (IsEdit) UpdateModel.FullName = e.Value?.ToString();
+                                               else Model.FullName = e.Value?.ToString();
+                                           }" />
+
+                <input placeholder="@L["phone"]"
+                       value="@(IsEdit? UpdateModel.PhoneNumber: Model.PhoneNumber)"
+                       @oninput="e => {
+                                           if (IsEdit) UpdateModel.PhoneNumber = e.Value?.ToString();
+                                           else Model.PhoneNumber = e.Value?.ToString();
+                                       }" />
+
+            <input placeholder="@L["city"]"
+                   value="@(IsEdit? UpdateModel.City: Model.City)"
+                   @oninput="e => {
+                                       if (IsEdit) UpdateModel.City = e.Value?.ToString();
+                                       else Model.City = e.Value?.ToString();
+                                   }" />
+
+        <input placeholder="@L["postal_code"]"
+               value="@(IsEdit? UpdateModel.PostalCode: Model.PostalCode)"
+               @oninput="e => {
+                                   if (IsEdit) UpdateModel.PostalCode = e.Value?.ToString();
+                                   else Model.PostalCode = e.Value?.ToString();
+                               }" />
+
+        <input placeholder="@L["address_field"]"
+               value="@(IsEdit? UpdateModel.AddressLine: Model.AddressLine)"
+               @oninput="e => {
+                                   if (IsEdit) UpdateModel.AddressLine = e.Value?.ToString();
+                                   else Model.AddressLine = e.Value?.ToString();
+                               }" />
+
+</div>
+
+<textarea placeholder="@L["notes_field"]"
+          @oninput="e => {
+                          if (IsEdit) UpdateModel.Notes = e.Value?.ToString();
+                          else Model.Notes = e.Value?.ToString();
+                                                    }">@(IsEdit? UpdateModel.Notes: Model.Notes)</textarea>
+
+<label class="checkbox">
+    <input type="checkbox"
+           checked="@(IsEdit? UpdateModel.IsDefault: Model.IsDefault)"
+           @onchange="e => {
+                               if (IsEdit) UpdateModel.IsDefault = (bool)e.Value;
+                               else Model.IsDefault = (bool)e.Value;
+                           }" />
+@L["set_as_default"]
+</label>
+
+</div>
+
+<!-- FOOTER -->
+@if (!string.IsNullOrEmpty(_saveError))
+{
+    <div class="error-text" style="padding: 0 1.5rem 0.5rem;">@_saveError</div>
+}
+<div class="modal-footer">
+    <button class="secondary-btn" @onclick="CloseModal">@L["cancel"]</button>
+    <button class="primary-btn" @onclick="Save">
+        @(IsSaving ? L["saving"] : L["save"])
+    </button>
+</div>
+
+</div>
+</div>
+}
+
+@code {
+    private List<AddressDTO> UserAddresses = new();
+    private bool IsLoading = true;
+
+    private bool IsModalOpen = false;
+    private bool IsEdit = false;
+    private bool IsSaving = false;
+    private string _saveError = string.Empty;
+
+    private AddressDTO Selected;
+    private CreateAddressDTO Model = new();
+    private UpdateAddressDTO UpdateModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            IsLoading = true;
+            UserAddresses = await addressService.GetUserAddresses() ?? new();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void OpenCreate()
+    {
+        Model = new CreateAddressDTO();
+        IsEdit = false;
+        IsModalOpen = true;
+    }
+
+    private void Edit(AddressDTO addr)
+    {
+        Selected = addr;
+
+        UpdateModel = new UpdateAddressDTO
+        {
+            Id = addr.Id,
+            FullName = addr.FullName,
+            PhoneNumber = addr.PhoneNumber,
+            City = addr.City,
+            AddressLine = addr.AddressLine,
+            PostalCode = addr.PostalCode,
+            Notes = addr.Notes,
+            IsDefault = addr.IsDefault
+        };
+
+        IsEdit = true;
+        IsModalOpen = true;
+    }
+
+    private async Task Save()
+    {
+        _saveError = string.Empty;
+        try
+        {
+            IsSaving = true;
+
+            var result = IsEdit
+                ? await addressService.UpdateAddress(UpdateModel)
+                : await addressService.CreateAddress(Model);
+
+            if (!result.Success)
+            {
+                _saveError = result.Message ?? "Failed to save address.";
+                return;
+            }
+
+            CloseModal();
+            await Load();
+        }
+        catch
+        {
+            _saveError = "An unexpected error occurred. Please try again.";
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        var result = await addressService.DeleteAddress(id);
+        if (result.Success)
+            await Load();
+        else
+            _saveError = result.Message ?? "Failed to delete address.";
+    }
+
+    private async Task SetDefault(AddressDTO addr)
+    {
+        var model = new UpdateAddressDTO
+        {
+            Id = addr.Id,
+            FullName = addr.FullName,
+            PhoneNumber = addr.PhoneNumber,
+            City = addr.City,
+            AddressLine = addr.AddressLine,
+            PostalCode = addr.PostalCode,
+            Notes = addr.Notes,
+            IsDefault = true
+        };
+
+        var result = await addressService.UpdateAddress(model);
+        if (result.Success)
+            await Load();
+        else
+            _saveError = result.Message ?? "Failed to set default address.";
+    }
+
+    private void CloseModal()
+    {
+        IsModalOpen = false;
+        _saveError = string.Empty;
+    }
+}

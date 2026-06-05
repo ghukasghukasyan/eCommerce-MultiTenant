@@ -1,0 +1,42 @@
+﻿@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+<div class="pagination-bar" @if="TotalPages > 1">
+    <button class="page-btn"
+            disabled="@(!CanGoPrev)"
+            @onclick="() => ChangePage(Page - 1)">
+        @L["prev"]
+    </button>
+
+    <span class="page-info">
+        @L["page_label"] <strong>@Page</strong> @L["of_label"] <strong>@TotalPages</strong>
+        • @TotalCount @L["items"]
+    </span>
+
+    <button class="page-btn"
+            disabled="@(!CanGoNext)"
+            @onclick="() => ChangePage(Page + 1)">
+        @L["next"]
+    </button>
+</div>
+
+@code {
+    [Parameter] public int Page { get; set; }
+    [Parameter] public int PageSize { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    int TotalPages =>
+        (int)Math.Ceiling((double)TotalCount / PageSize);
+
+    bool CanGoPrev => Page > 1;
+    bool CanGoNext => Page < TotalPages;
+
+    async Task ChangePage(int page)
+    {
+        if (page < 1 || page > TotalPages)
+            return;
+
+        await OnPageChanged.InvokeAsync(page);
+    }
+}

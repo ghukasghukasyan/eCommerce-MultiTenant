@@ -1,0 +1,452 @@
+﻿@page "/admin/sales"
+@layout Admin
+@inherits PagedComponentBase
+@using static ClientLibrary.Enums.Statuses
+
+<div class="sales-page">
+
+    <div class="sales-header">
+        <h2>Sales Overview</h2>
+        <button class="refresh-btn"
+                type="button"
+                @onclick="RefreshOrders">
+            ⟳ Refresh
+        </button>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="sales-filters">
+        <div class="filter-group">
+            <label>From</label>
+            <input type="date" class="filter-input"
+                   value="@(FilterFrom?.ToString("yyyy-MM-dd"))"
+                   @onchange="e => { var s = e.Value?.ToString(); FilterFrom = !string.IsNullOrWhiteSpace(s) && DateTime.TryParse(s, out var d) ? d : (DateTime?)null; }" />
+        </div>
+        <div class="filter-group">
+            <label>To</label>
+            <input type="date" class="filter-input"
+                   value="@(FilterTo?.ToString("yyyy-MM-dd"))"
+                   @onchange="e => { var s = e.Value?.ToString(); FilterTo = !string.IsNullOrWhiteSpace(s) && DateTime.TryParse(s, out var d) ? d : (DateTime?)null; }" />
+        </div>
+        <div class="filter-group">
+            <label>Status</label>
+            <select class="filter-input" @bind="FilterStatus">
+                <option value="">All</option>
+                @foreach (OrderStatus s in Enum.GetValues<OrderStatus>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+        <button class="filter-apply-btn" @onclick="ApplyFilters">Apply</button>
+        <button class="filter-clear-btn" @onclick="ClearFilters">Clear</button>
+    </div>
+
+    @if (!Orders.Items.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa fa-receipt"></i></div>
+            <h4 class="empty-state-title">No sales yet</h4>
+            <p class="empty-state-sub">Orders will appear here once customers start purchasing.</p>
+        </div>
+    }
+    else
+    {
+        var groupedByDate = Orders.Items
+        .GroupBy(o => o.CreatedAt.Date)
+        .OrderByDescending(g => g.Key);
+
+        @foreach (var dayGroup in groupedByDate)
+        {
+            <div class="day-card">
+                <div class="day-header">
+                    📅 @dayGroup.Key.ToString("dd MMM yyyy")
+                    <span>(@dayGroup.Count() orders)</span>
+                </div>
+
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Email</th>
+                            <th>Items</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in dayGroup)
+                        {
+                            <tr>
+                                <td>@order.CustomerName</td>
+                                <td>@order.CustomerEmail</td>
+                                <td>@order.ItemsCount</td>
+                                <td>@GetStatusBadge(order.Status)</td>
+                                <td class="amount">@Cur.Format(order.TotalAmount)</td>
+                                <td>
+                                    <button class="view-btn"
+                                            type="button"
+                                            @onclick="() => OpenDetails(order.Id)">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@if (TotalPages > 1)
+{
+    <div class="pagination-bar">
+        <button class="page-btn"
+                disabled="@(!CanGoPrev)"
+                @onclick="PrevPageAsync">
+            ← Prev
+        </button>
+
+        <span class="page-info">
+            Page <strong>@Page</strong> of <strong>@TotalPages</strong>
+            • @TotalCount orders
+        </span>
+
+        <button class="page-btn"
+                disabled="@(!CanGoNext)"
+                @onclick="NextPageAsync">
+            Next →
+        </button>
+    </div>
+}
+
+@if (IsDetailsOpen && SelectedOrder != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-backdrop" @onclick="CloseDetails"></div>
+
+        <div class="order-modal" @key="SelectedOrder.OrderId">
+
+            <!-- HEADER -->
+            <div class="order-modal-header">
+                <div>
+                    <h3>Order</h3>
+                    <div class="order-id">@SelectedOrder.OrderId</div>
+                </div>
+                <button type="button"
+                        class="icon-btn"
+                        @onclick="CloseDetails">
+                    ✕
+                </button>
+            </div>
+
+            <!-- SUMMARY -->
+            <div class="order-summary">
+                <div class="summary-block">
+                    <div class="label">Customer</div>
+                    <div class="value">@SelectedOrder.CustomerName</div>
+                </div>
+
+                <div class="summary-block">
+                    <div class="label">Email</div>
+                    <div class="value">@SelectedOrder.CustomerEmail</div>
+                </div>
+
+                <div class="summary-block">
+                    <div class="label">Date</div>
+                    <div class="value">@SelectedOrder.CreatedAt</div>
+                </div>
+
+                <div class="summary-block">
+                    <div class="label">Total</div>
+                    <div class="value total">@Cur.Format(SelectedOrder.TotalAmount)</div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(SelectedOrder.CouponCode))
+                {
+                    <div class="summary-block">
+                        <div class="label">Coupon</div>
+                        <div class="value coupon-code">@SelectedOrder.CouponCode</div>
+                    </div>
+                    <div class="summary-block">
+                        <div class="label">Discount</div>
+                        <div class="value discount-amount">− @Cur.Format(SelectedOrder.DiscountAmount ?? 0)</div>
+                    </div>
+                }
+            </div>
+
+            <!-- STATUS -->
+            <div class="status-editor">
+                <span>Status</span>
+
+                <select value="@EditableStatus"
+                        @onchange="OnStatusChanged">
+                    @foreach (OrderStatus s in Enum.GetValues<OrderStatus>())
+                    {
+                        <option value="@s"
+                                selected="@(s == EditableStatus)"
+                                disabled="@(s != SelectedOrder.Status &&
+                                                                            !CanTransition(SelectedOrder.Status, s))">
+                    @s
+                </option>
+                                }
+                </select>
+
+                <button class="primary-btn"
+                        type="button"
+                        @onclick="UpdateStatus">
+                    @(IsUpdating ? "Saving..." : "Save")
+                </button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(StatusUpdateError))
+            {
+                <div class="form-error">@StatusUpdateError</div>
+            }
+
+            <!-- PRODUCTS -->
+            <div class="products-title">
+                Products (@SelectedOrder.ItemsCount)
+            </div>
+
+            <div class="products-grid">
+                @foreach (var item in SelectedOrder.Items)
+                {
+                    <div class="product-card">
+                        <img src="@ResolveImage(item.ImageUrl)"
+                             class="product-thumb"
+                             alt="@item.ProductName" />
+
+                        <div>
+                            <div>@item.ProductName</div>
+                            @if (item.VariantAttributes?.Count > 0)
+                            {
+                                <div class="order-item-variant">@FormatVariant(item.VariantAttributes)</div>
+                            }
+                            <div>Qty: @item.Quantity</div>
+                            <div>@Cur.Format(item.UnitPrice)</div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- SHIPPING -->
+            @if (SelectedOrder.ShippingDetail != null)
+            {
+                <div class="shipping-section">
+                    <div class="shipping-title">Shipping details</div>
+
+                    <div class="shipping-grid">
+                        <div class="shipping-item">
+                            <div class="label">Full name</div>
+                            <div class="value">@SelectedOrder.ShippingDetail.FullName</div>
+                        </div>
+
+                        <div class="shipping-item">
+                            <div class="label">Phone</div>
+                            <div class="value">@SelectedOrder.ShippingDetail.PhoneNumber</div>
+                        </div>
+
+                        <div class="shipping-item">
+                            <div class="label">City</div>
+                            <div class="value">@SelectedOrder.ShippingDetail.City</div>
+                        </div>
+
+                        <div class="shipping-item">
+                            <div class="label">Address</div>
+                            <div class="value">@SelectedOrder.ShippingDetail.Address</div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(SelectedOrder.ShippingDetail.Notes))
+                        {
+                            <div class="shipping-item shipping-notes">
+                                <div class="label">Notes</div>
+                                <div class="value">@SelectedOrder.ShippingDetail.Notes</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+@code {
+
+    /* ================= STATE ================= */
+
+    PagedResult<OrderDTO> Orders = new()
+    {
+        Items = new List<OrderDTO>(),
+        TotalCount = 0
+    };
+
+    OrderDetailDTO SelectedOrder;
+    OrderStatus EditableStatus;
+
+    bool IsDetailsOpen;
+    bool IsUpdating;
+    string StatusUpdateError = string.Empty;
+
+    DateTime? FilterFrom;
+    DateTime? FilterTo;
+    string FilterStatus = "";
+
+    /* ================= INIT ================= */
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    protected override async Task LoadDataAsync()
+    {
+        OrderStatus? status = string.IsNullOrWhiteSpace(FilterStatus)
+            ? null
+            : Enum.Parse<OrderStatus>(FilterStatus);
+
+        Orders = await orderService.GetAll(
+            new OrderFilterDTO
+            {
+                Page = Page,
+                PageSize = PageSize,
+                From = FilterFrom,
+                To = FilterTo,
+                Status = status
+            });
+
+        TotalCount = Orders.TotalCount;
+    }
+
+    /* ================= ACTIONS ================= */
+
+    async Task RefreshOrders()
+    {
+        await ResetPagingAsync();
+    }
+
+    async Task ApplyFilters()
+    {
+        await ResetPagingAsync();
+    }
+
+    async Task ClearFilters()
+    {
+        FilterFrom = null;
+        FilterTo = null;
+        FilterStatus = "";
+        await ResetPagingAsync();
+    }
+
+    async Task OpenDetails(Guid id)
+    {
+        SelectedOrder = await orderService.GetById(id);
+
+        if (SelectedOrder != null)
+        {
+            EditableStatus = SelectedOrder.Status;
+            IsDetailsOpen = true;
+        }
+    }
+
+    void CloseDetails()
+    {
+        IsDetailsOpen = false;
+        SelectedOrder = null;
+    }
+
+    void OnStatusChanged(ChangeEventArgs e)
+    {
+        EditableStatus = Enum.Parse<OrderStatus>(e.Value!.ToString()!);
+        StatusUpdateError = string.Empty;
+    }
+
+    async Task UpdateStatus()
+    {
+        if (IsUpdating || SelectedOrder == null)
+            return;
+
+        if (EditableStatus == SelectedOrder.Status)
+            return;
+
+        StatusUpdateError = string.Empty;
+        IsUpdating = true;
+
+        try
+        {
+            var response = await orderService.UpdateStatus(
+                new UpdateOrderStatusDTO
+                {
+                    OrderId = SelectedOrder.OrderId,
+                    Status = EditableStatus
+                });
+
+            if (!response.Success)
+            {
+                StatusUpdateError = string.IsNullOrWhiteSpace(response.Message)
+                    ? "Failed to update status. Please try again."
+                    : response.Message;
+                return;
+            }
+
+            SelectedOrder.Status = EditableStatus;
+
+            var listItem = Orders.Items
+                .FirstOrDefault(x => x.Id == SelectedOrder.OrderId);
+
+            if (listItem != null)
+                listItem.Status = EditableStatus;
+        }
+        finally
+        {
+            IsUpdating = false;
+        }
+    }
+
+    /* ================= HELPERS ================= */
+
+    private string ResolveImage(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "/images/placeholder.png";
+        return url;
+    }
+
+    private static string FormatVariant(Dictionary<string, string> attrs) =>
+        string.Join(" · ", attrs.Select(kv => $"{kv.Key}: {kv.Value}"));
+
+    bool CanTransition(OrderStatus current, OrderStatus target) =>
+        current switch
+        {
+            OrderStatus.Pending =>
+                target is OrderStatus.Paid or OrderStatus.Cancelled or OrderStatus.Failed,
+
+            OrderStatus.Paid =>
+                target is OrderStatus.Shipped or OrderStatus.Cancelled,
+
+            OrderStatus.Shipped =>
+                target is OrderStatus.Completed,
+
+            _ => false
+        };
+
+    MarkupString GetStatusBadge(OrderStatus status)
+    {
+        var (icon, text, css) = status switch
+        {
+            OrderStatus.Pending => ("🕒", "Pending", "pending"),
+            OrderStatus.Paid => ("✔️", "Paid", "paid"),
+            OrderStatus.Shipped => ("🚚", "Shipped", "shipped"),
+            OrderStatus.Completed => ("🏁", "Completed", "completed"),
+            OrderStatus.Cancelled => ("❌", "Cancelled", "cancelled"),
+            OrderStatus.Failed => ("⚠️", "Failed", "cancelled"),
+            _ => ("?", "Unknown", "")
+        };
+
+        return new MarkupString(
+            $"<span class='badge {css}' title='{text}'>{icon}</span>"
+        );
+    }
+}

@@ -1,0 +1,129 @@
+@using System.Timers
+@implements IDisposable
+
+<section class="hero-carousel"
+         @ontouchstart="OnTouchStart"
+         @ontouchend="OnTouchEnd">
+
+    @foreach (var (slide, index) in _slides.Select((s, i) => (s, i)))
+    {
+        <div class="hero-slide @(index == _currentIndex ? "active" : "")"
+             style="background: @slide.FallbackGradient">
+
+            <img src="@(_apiBase + slide.ImagePath)"
+                 class="hero-slide-img"
+                 alt=""
+                 onerror="this.style.display='none'" />
+
+            @if (index == _currentIndex)
+            {
+                <div class="hero-overlay">
+                    <div class="hero-eyebrow">
+                        <span class="hero-eyebrow-line"></span>
+                        <span class="hero-tag">@slide.Tag</span>
+                    </div>
+                    <h1>@slide.Title</h1>
+                    <p>@slide.Subtitle</p>
+                    <div class="hero-cta-group">
+                        <a class="hero-cta" href="@slide.CtaUrl">
+                            @slide.CtaLabel
+                            <i class="fa fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            }
+
+        </div>
+    }
+
+    <!-- NAV ARROWS -->
+    <button class="hero-arrow hero-arrow-prev" @onclick="PrevSlide" aria-label="Previous slide">
+        <i class="fa fa-chevron-left"></i>
+    </button>
+    <button class="hero-arrow hero-arrow-next" @onclick="NextSlide" aria-label="Next slide">
+        <i class="fa fa-chevron-right"></i>
+    </button>
+
+    <!-- DOTS + COUNTER -->
+    <div class="hero-indicators">
+        <span class="hero-counter">
+            <span>@((_currentIndex + 1).ToString("D2"))</span> / @(_slides.Count.ToString("D2"))
+        </span>
+        <div class="hero-dots">
+            @for (int i = 0; i < _slides.Count; i++)
+            {
+                var idx = i;
+                <button class="hero-dot @(idx == _currentIndex ? "active" : "")"
+                        @onclick="() => GoToSlide(idx)"
+                        aria-label="@($"Slide {idx + 1}")">
+                </button>
+            }
+        </div>
+    </div>
+
+</section>
+
+@code {
+    private int _currentIndex;
+    private System.Timers.Timer? _timer;
+    private double _touchStartX;
+    private List<HeroSlideConfig> _slides = new();
+    private string _apiBase = "";
+
+    protected override void OnInitialized()
+    {
+        var hubUrl = Tenant.HubBaseUrl ?? "";
+        if (Uri.TryCreate(hubUrl, UriKind.Absolute, out var uri))
+            _apiBase = $"{uri.Scheme}://{uri.Authority}";
+
+        _slides = Tenant.HeroSlides.Count > 0
+            ? Tenant.HeroSlides
+            : new List<HeroSlideConfig>
+            {
+                new() { Title = "Welcome", Subtitle = "Explore our collection.", CtaLabel = "Shop Now", CtaUrl = "/" }
+            };
+
+        StartTimer();
+    }
+
+    private void StartTimer()
+    {
+        _timer = new System.Timers.Timer(5500);
+        _timer.Elapsed += (_, _) =>
+        {
+            _currentIndex = (_currentIndex + 1) % _slides.Count;
+            InvokeAsync(StateHasChanged);
+        };
+        _timer.AutoReset = true;
+        _timer.Start();
+    }
+
+    private void GoToSlide(int index) { _currentIndex = index; ResetTimer(); }
+    private void NextSlide() { _currentIndex = (_currentIndex + 1) % _slides.Count; ResetTimer(); }
+    private void PrevSlide() { _currentIndex = (_currentIndex - 1 + _slides.Count) % _slides.Count; ResetTimer(); }
+
+    private void ResetTimer() { _timer?.Stop(); _timer?.Start(); }
+
+    private void OnTouchStart(TouchEventArgs e)
+    {
+        if (e.ChangedTouches.Length > 0)
+            _touchStartX = e.ChangedTouches[0].ClientX;
+    }
+
+    private void OnTouchEnd(TouchEventArgs e)
+    {
+        if (e.ChangedTouches.Length == 0) return;
+        var delta = e.ChangedTouches[0].ClientX - _touchStartX;
+        if (Math.Abs(delta) > 50)
+        {
+            if (delta < 0) NextSlide();
+            else PrevSlide();
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+    }
+}

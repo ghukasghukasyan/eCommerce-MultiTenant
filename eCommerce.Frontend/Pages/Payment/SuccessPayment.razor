@@ -1,0 +1,56 @@
+﻿@page "/payment-success"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Orders
+@using ClientLibrary.States
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-6 offset-3 m-5 p-5">
+            <div class="alert alert alert-success text-center">
+                @L["payment_success_msg"]
+            </div>
+        </div>
+   </div>
+</div>
+
+@code {
+    [CascadingParameter] public Task<AuthenticationState>? UserAuthState { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await UserAuthState!).User;
+            if (user.Identity!.IsAuthenticated)
+            {
+                string cartString = await browserCookieStorageService.GetAsync(AppConstants.Order.CartName);
+                if (!string.IsNullOrEmpty(cartString))
+                {
+                    var cartItems = JsonSerializer.Deserialize<IEnumerable<CartItemDTO>>(cartString);
+                    if (cartItems == null || !cartItems.Any())
+                        return;
+
+                    var request = new CreateOrderDTO
+                    {
+                        Items = cartItems.Select(x => new CreateOrderItemDTO
+                        {
+                            VariantId = x.VariantId,
+                            ProductId = x.ProductId,
+                            Quantity = x.Quantity
+                        }).ToList()
+                    };
+
+                    await orderService.SaveOrder(request);
+                    await browserCookieStorageService.RemoveAsync(AppConstants.Order.CartName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SuccessPayment] Failed to process cart after payment: {ex.Message}");
+        }
+
+    }
+
+
+}

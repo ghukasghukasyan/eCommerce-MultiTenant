@@ -1,0 +1,40 @@
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@inherits LayoutComponentBase
+@inject ILanguageService languageService
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="layout-root">
+    <Header />
+    <main class="layout-content">
+        @Body
+    </main>
+    <Footer />
+    <PwaInstallBanner />
+    <CartDrawer />
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        languageService.OnChange += OnLanguageChanged;
+        NavManager.LocationChanged += OnLocationChanged;
+        await Cur.InitializeAsync();
+    }
+
+    private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _ = JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    public void Dispose()
+    {
+        languageService.OnChange -= OnLanguageChanged;
+        NavManager.LocationChanged -= OnLocationChanged;
+    }
+}

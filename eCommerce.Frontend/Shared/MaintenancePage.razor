@@ -1,0 +1,38 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="maintenance-page">
+    <div class="maintenance-card">
+
+        <div class="maintenance-icon">
+            <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="40" cy="40" r="38" stroke="#e8e8e8" stroke-width="1.5" />
+                <path d="M40 22v20" stroke="#111" stroke-width="2" stroke-linecap="round" />
+                <circle cx="40" cy="52" r="2" fill="#f26522" />
+            </svg>
+        </div>
+
+        <span class="maintenance-label">Something went wrong</span>
+        <h1 class="maintenance-title">We'll be right back</h1>
+        <p class="maintenance-sub">
+            We're experiencing a temporary issue. Our team has been notified
+            and is working to fix it. Please try again in a moment.
+        </p>
+
+        <div class="maintenance-actions">
+            <button class="maintenance-btn-primary" @onclick="Reload">
+                <i class="fa fa-rotate-right"></i>
+                Try again
+            </button>
+            <a href="/" class="maintenance-btn-ghost">
+                Go to homepage
+            </a>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public Exception? Exception { get; set; }
+
+    private void Reload() => NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+}

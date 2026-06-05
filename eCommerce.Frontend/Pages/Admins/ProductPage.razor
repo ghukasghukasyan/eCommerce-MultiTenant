@@ -1,0 +1,946 @@
+﻿@page "/admin/product"
+@using System.ComponentModel.DataAnnotations
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@attribute [Authorize(Roles = "Admin")]
+@layout Admin
+
+@inject IProductService productService
+@inject ICategoryService categoryService
+@inject IVariantService variantService
+@inject IVariantAttributeService variantAttributeService
+@inject ILogger<ProductPage> Logger
+
+<GlobalError Error="@_pageError" />
+
+<div class="admin-page admin-product-page">
+
+    <div class="admin-header">
+        <h2>Manage Products</h2>
+        <button class="btn btn-primary" @onclick="ShowAddProductDialog">
+            + Add Product
+        </button>
+    </div>
+
+    <div class="admin-card">
+        @if (!Products.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa fa-box"></i></div>
+                <h4 class="empty-state-title">No products yet</h4>
+                <p class="empty-state-sub">Get started by adding your first product.</p>
+                <button class="btn btn-primary" @onclick="ShowAddProductDialog">+ Add product</button>
+            </div>
+        }
+        else
+        {
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Qty</th>
+                        <th>Best Seller</th>
+                        <th style="width:200px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in Products)
+                    {
+                        var mainImage = product.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl;
+
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(mainImage))
+                                {
+                                   <img src="@ResolveImage(mainImage)" class="product-thumb" />
+                                }
+                            </td>
+
+                            <td>@product.Name</td>
+                            <td>@product.Price</td>
+                            <td>@product.Stock</td>
+
+                            <!-- BEST SELLER -->
+                            <td>
+                                <div class="status-cell">
+                                    <label class="switch">
+                                        <input type="checkbox"
+                                               checked="@product.IsBestSeller"
+                                               disabled="@_updatingBestSeller.Contains(product.Id)"
+                                               @onchange="async e => await ToggleBestSeller(product, (bool)e.Value!)" />
+                                        <span class="slider"></span>
+                                    </label>
+
+                                    @if (product.IsBestSeller)
+                                    {
+                                        <span class="badge badge-best">Best Seller</span>
+                                    }
+                                </div>
+                            </td>
+
+
+                            <!-- ACTIONS -->
+                            <td class="action-cell">
+                                <button class="icon-btn danger"
+                                        title="Delete"
+                                        @onclick="() => DeleteProduct(product.Id)">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+
+                                <button class="btn-soft"
+                                        @onclick="() => EditProduct(product)">
+                                    Update
+                                </button>
+
+                                <button class="btn-soft"
+                                        title="Manage Variants"
+                                        @onclick="() => OpenVariantModal(product)">
+                                    Variants @(product.Variants?.Count > 0 ? $"({product.Variants.Count})" : "")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        }
+    </div>
+</div>
+
+@if (ShowVariantModal && VariantProduct is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseVariantModal">
+        <div class="admin-modal admin-modal-wide" @onclick:stopPropagation>
+
+            <div class="modal-header">
+                <h4>Variants: @VariantProduct.Name</h4>
+                <button class="icon-btn" @onclick="CloseVariantModal"><i class="fa fa-times"></i></button>
+            </div>
+
+            @if (_loadingVariants)
+            {
+                <div class="text-center py-3"><i class="fa fa-spinner fa-spin"></i> Loading...</div>
+            }
+            else
+            {
+                <!-- CURRENT VARIANTS -->
+                @if (VariantRows.Any())
+                {
+                    <h5 class="mt-3 mb-2">Current Variants</h5>
+                    <table class="admin-table variant-table">
+                        <thead>
+                            <tr>
+                                <th>Attributes</th>
+                                <th style="width:110px;">Price</th>
+                                <th style="width:90px;">Stock</th>
+                                <th style="width:80px;">Active</th>
+                                <th style="width:80px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in VariantRows)
+                            {
+                                <tr class="@(!row.IsActive ? "variant-inactive" : "")">
+                                    <td class="variant-attrs">@row.AttributesSummary</td>
+                                    <td><input class="form-control form-control-sm" type="number" @bind="row.Price" min="0" step="0.01" /></td>
+                                    <td><input class="form-control form-control-sm" type="number" @bind="row.Stock" min="0" /></td>
+                                    <td>
+                                        <label class="switch">
+                                            <input type="checkbox" @bind="row.IsActive" />
+                                            <span class="slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        @if (row.Saving)
+                                        {
+                                            <i class="fa fa-spinner fa-spin"></i>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-soft btn-sm" @onclick="() => SaveVariantRow(row)">Save</button>
+                                        }
+                                        @if (!string.IsNullOrEmpty(row.Error))
+                                        {
+                                            <div class="form-error">@row.Error</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted mt-3">No variants yet. Generate some below.</p>
+                }
+
+                <!-- GENERATE VARIANTS -->
+                <div class="variant-generate-section mt-4">
+                    <h5>Variant Attributes</h5>
+                    <p class="text-muted" style="font-size:12px;">
+                        All attribute dimensions and their values. Clicking <b>Generate Combinations</b> rebuilds every combination from scratch.
+                        @if (VariantRows.Any())
+                        {
+                            <span> Existing attributes are pre-filled — add a new dimension or edit values, then regenerate.</span>
+                        }
+                    </p>
+
+                    @foreach (var row in GenerateRows)
+                    {
+                        <div class="generate-row" @key="row.AttributeId">
+                            <div class="generate-row-header">
+                                <span class="generate-attr-name">@row.AttributeName</span>
+                                <button class="icon-btn danger sm" @onclick="() => GenerateRows.Remove(row)">
+                                    <i class="fa fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="chip-input-area">
+                                @foreach (var val in row.Values)
+                                {
+                                    <span class="chip" @key="val">
+                                        @val
+                                        <button type="button" class="chip-remove" @onclick="() => row.Values.Remove(val)">×</button>
+                                    </span>
+                                }
+                                <input class="chip-input"
+                                       placeholder="Add value, press Enter"
+                                       @bind="row.CurrentInput"
+                                       @bind:event="oninput"
+                                       @onkeydown="e => AddChipOnEnter(e, row)" />
+                            </div>
+                        </div>
+                    }
+
+                    <div class="generate-add-row mt-2">
+                        @if (_showAttrPicker)
+                        {
+                            <div class="attr-picker">
+                                <select class="form-control form-control-sm" @onchange="OnAttrPickerChange">
+                                    <option value="">— select attribute —</option>
+                                    @foreach (var attr in AllAttributes)
+                                    {
+                                        <option value="@attr.Id">@attr.Name</option>
+                                    }
+                                    <option value="__new__">+ Create new attribute…</option>
+                                </select>
+
+                                @if (_showNewAttrInput)
+                                {
+                                    <div class="new-attr-row mt-1">
+                                        <input class="form-control form-control-sm"
+                                               placeholder="New attribute name"
+                                               @bind="_newAttrName" />
+                                        <button class="btn-soft btn-sm" @onclick="CreateAndAddAttribute">Add</button>
+                                        <button class="btn-outline btn-sm" @onclick="() => _showNewAttrInput = false">Cancel</button>
+                                    </div>
+                                }
+
+                                <button class="btn-outline btn-sm mt-1" @onclick="() => _showAttrPicker = false">Cancel</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button class="btn-soft btn-sm" @onclick="() => _showAttrPicker = true">
+                                <i class="fa fa-plus"></i> Add Attribute
+                            </button>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(VariantError))
+                    {
+                        <div class="form-error mt-2">@VariantError</div>
+                    }
+
+                    @if (GenerateRows.Any(r => r.Values.Any()))
+                    {
+                        <button class="btn btn-primary mt-3"
+                                disabled="@_generating"
+                                @onclick="GenerateVariants">
+                            @if (_generating)
+                            {
+                                <i class="fa fa-spinner fa-spin"></i>
+                            }
+                            Generate Combinations
+                        </button>
+                    }
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+@if (ShowDialog)
+{
+    <div class="admin-modal-backdrop" @onclick="Cancel">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>@(IsEditMode ? "Update Product" : "Add Product")</h4>
+
+            <EditForm Model="ProductForm" OnValidSubmit="SaveProduct">
+                <DataAnnotationsValidator />
+
+                <label>Name</label>
+                <InputText class="form-control" @bind-Value="ProductForm.Name" />
+
+                <label class="mt-3">Price</label>
+                <InputNumber class="form-control" @bind-Value="ProductForm.Price" />
+
+                <label class="mt-3">Quantity</label>
+                <InputNumber class="form-control" @bind-Value="ProductForm.Quantity" />
+
+                <label class="mt-3">Description</label>
+                <InputTextArea class="form-control" @bind-Value="ProductForm.Description" />
+
+                <label class="mt-3">Category</label>
+                <InputSelect class="form-control" @bind-Value="ProductForm.CategoryId">
+                    <option value="">Select category</option>
+                    @foreach (var cat in Categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </InputSelect>
+
+                @if (!IsEditMode)
+                {
+                    <small class="text-warning">Save product first, then upload images.</small>
+                }
+
+                <label class="mt-3">Images</label>
+                <InputFile OnChange="UploadFiles" multiple accept="image/*" disabled="@(!IsEditMode)" />
+
+                @if (ProductForm.Images.Any())
+                {
+                    <div class="image-grid mt-3">
+                        @foreach (var img in ProductForm.Images)
+                        {
+                            <div class="image-card">
+
+                                <!-- Focal point picker: click anywhere on the image to set crop anchor -->
+                                <div class="focal-wrap" title="Click to set crop focus point">
+                                    <div class="focal-preview" @onclick="async e => await SetFocalPoint(img, e)">
+                                        <img src="@img.PreviewUrl"
+                                             class="focal-img"
+                                             style="object-position: @img.ObjectPosition" />
+                                        <div class="focal-dot" style="left: @GetDotX(img.ObjectPosition); top: @GetDotY(img.ObjectPosition);"></div>
+                                        <div class="focal-hint">Click to set focus</div>
+                                        @if (img.SavingPosition)
+                                        {
+                                            <div class="focal-saving"><i class="fa fa-spinner fa-spin"></i></div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="image-actions">
+                                    <label>
+                                        <input type="radio" name="mainImage"
+                                               checked="@img.IsMain"
+                                               @onchange="() => SetMainImage(img)" />
+                                        Main
+                                    </label>
+                                    <button type="button" class="trash-btn"
+                                            @onclick="async () => await RemoveImage(img)">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(ModalError))
+                {
+                    <div class="form-error">@ModalError</div>
+                }
+
+                <div class="modal-actions">
+                    <button class="btn btn-primary" type="submit">Save</button>
+                    <button class="btn btn-outline" type="button" @onclick="Cancel">Cancel</button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    // ==========================
+    // View Models
+    // ==========================
+
+    public class VariantEditRow
+    {
+        public Guid VariantId { get; set; }
+        public string AttributesSummary { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int Stock { get; set; }
+        public bool IsActive { get; set; }
+        public bool Saving { get; set; }
+        public string? Error { get; set; }
+    }
+
+    public class AttributeInputRow
+    {
+        public Guid? AttributeId { get; set; }
+        public string AttributeName { get; set; } = string.Empty;
+        public List<string> Values { get; set; } = new();
+        public string CurrentInput { get; set; } = string.Empty;
+    }
+
+    public class ProductImageVM
+    {
+        public string ImageUrl { get; set; }
+        public string PreviewUrl { get; set; } = string.Empty;
+        public bool IsMain { get; set; }
+        public int DisplayOrder { get; set; }
+        public string ObjectPosition { get; set; } = "center";
+        public bool SavingPosition { get; set; }
+    }
+
+    public class ProductFormModel
+    {
+        [Required(ErrorMessage = "Product name is required.")]
+        [MaxLength(200, ErrorMessage = "Product name must not exceed 200 characters.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than zero.")]
+        public decimal Price { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative.")]
+        public int Quantity { get; set; }
+
+        [Required(ErrorMessage = "Category is required.")]
+        public Guid CategoryId { get; set; }
+
+        public List<ProductImageVM> Images { get; set; } = new();
+    }
+
+    // ==========================
+    // State
+    // ==========================
+
+    private bool ShowDialog;
+    private bool IsEditMode;
+    private Guid EditingProductId;
+    private string ModalError = string.Empty;
+    private string _pageError = string.Empty;
+
+    private List<GetProductDTO> Products = new();
+    private List<GetCategoryDTO> Categories = new();
+    private ProductFormModel ProductForm = new();
+
+    // Tracks which product IDs are currently toggling best-seller (replaces DTO UI state)
+    private readonly HashSet<Guid> _updatingBestSeller = new();
+
+    // Variant modal state
+    private bool ShowVariantModal;
+    private GetProductDTO? VariantProduct;
+    private List<VariantEditRow> VariantRows = new();
+    private List<VariantAttributeDTO> AllAttributes = new();
+    private List<AttributeInputRow> GenerateRows = new();
+    private bool _loadingVariants;
+    private bool _generating;
+    private bool _showAttrPicker;
+    private bool _showNewAttrInput;
+    private string _newAttrName = string.Empty;
+    private string VariantError = string.Empty;
+
+    // ==========================
+    // Lifecycle
+    // ==========================
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Categories = (await categoryService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load categories.";
+            Logger.LogError(ex, "Error loading categories on product page");
+        }
+        await LoadProducts();
+    }
+
+    private int _page = 1;
+    private const int _pageSize = 20;
+    private int _totalProducts = 0;
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            var paged = await productService.GetAllAsync(_page, _pageSize);
+            Products = paged.Items.ToList();
+            _totalProducts = paged.TotalCount;
+            _pageError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load products. Please refresh.";
+            Logger.LogError(ex, "Error loading products");
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        _page = page;
+        await LoadProducts();
+    }
+
+    // ==========================
+    // Dialog Handling
+    // ==========================
+
+    private void ShowAddProductDialog()
+    {
+        ProductForm = new();
+        ModalError = string.Empty;
+        EditingProductId = Guid.Empty;
+        IsEditMode = false;
+        ShowDialog = true;
+    }
+
+    private async Task EditProduct(GetProductDTO product)
+    {
+        var fresh = await productService.GetByIdAsync(product.Id);
+
+        if (fresh == null)
+        {
+            _pageError = "Product could not be loaded. It may have been deleted or has no active variants.";
+            await LoadProducts();
+            return;
+        }
+
+        EditingProductId = fresh.Id;
+        IsEditMode = true;
+
+        ProductForm = new ProductFormModel
+        {
+            Name = fresh.Name,
+            Description = fresh.Description,
+            Price = fresh.Price,
+            Quantity = fresh.Stock,
+            CategoryId = fresh.CategoryId,
+            Images = fresh.Images.Select(i => new ProductImageVM
+            {
+                ImageUrl = i.ImageUrl,
+                PreviewUrl = i.ImageUrl,
+                IsMain = i.IsMain,
+                DisplayOrder = i.DisplayOrder,
+                ObjectPosition = i.ObjectPosition ?? "center"
+            }).ToList()
+        };
+
+        ShowDialog = true;
+    }
+
+    private void Cancel()
+    {
+        ShowDialog = false;
+        ModalError = string.Empty;
+        ProductForm = new();
+    }
+
+    // ==========================
+    // Save Logic (Concurrency Safe)
+    // ==========================
+
+    private async Task SaveProduct()
+    {
+        ModalError = string.Empty;
+        try
+        {
+            if (!IsEditMode)
+            {
+                var result = await productService.AddAsync(new CreateProductDTO
+                {
+                    Name = ProductForm.Name,
+                    Description = ProductForm.Description,
+                    InitialPrice = ProductForm.Price,
+                    InitialStock = ProductForm.Quantity,
+                    CategoryId = ProductForm.CategoryId
+                });
+
+                if (!result.Success)
+                {
+                    ModalError = string.IsNullOrWhiteSpace(result.Message)
+                        ? "Something went wrong. Please try again."
+                        : result.Message;
+                    Logger.LogWarning("AddProduct failed: {Message}", result.Message);
+                    return;
+                }
+
+                EditingProductId = result.Data;
+                IsEditMode = true;
+
+                await LoadProducts();
+                return;
+            }
+
+            var updateResult = await productService.UpdateAsync(new UpdateProductDTO
+            {
+                Id = EditingProductId,
+                Name = ProductForm.Name,
+                Description = ProductForm.Description,
+                Price = ProductForm.Price,
+                Stock = ProductForm.Quantity,
+                CategoryId = ProductForm.CategoryId,
+            });
+
+            if (!updateResult.Success)
+            {
+                ModalError = string.IsNullOrWhiteSpace(updateResult.Message)
+                    ? "Something went wrong. Please try again."
+                    : updateResult.Message;
+                Logger.LogWarning("UpdateProduct failed for {Id}: {Message}", EditingProductId, updateResult.Message);
+                return;
+            }
+
+            await LoadProducts();
+            Cancel();
+        }
+        catch (Exception ex)
+        {
+            ModalError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error saving product");
+        }
+    }
+
+    // ==========================
+    // Image Handling
+    // ==========================
+
+    private async Task UploadFiles(InputFileChangeEventArgs e)
+    {
+        if (EditingProductId == Guid.Empty)
+            return;
+
+        ModalError = string.Empty;
+        foreach (var file in e.GetMultipleFiles(6))
+        {
+            try
+            {
+                var url = await productService.UploadImageAsync(EditingProductId, file);
+                ProductForm.Images.Add(new ProductImageVM
+                {
+                    ImageUrl = url,
+                    PreviewUrl = url,
+                    DisplayOrder = ProductForm.Images.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                ModalError = $"Failed to upload '{file.Name}': {ex.Message}";
+                Logger.LogError(ex, "Error uploading image {FileName} for product {Id}", file.Name, EditingProductId);
+                break;
+            }
+        }
+
+        if (ProductForm.Images.Any() && !ProductForm.Images.Any(i => i.IsMain))
+            ProductForm.Images.First().IsMain = true;
+    }
+
+    private async Task RemoveImage(ProductImageVM img)
+    {
+        if (!string.IsNullOrEmpty(img.ImageUrl))
+        {
+            var result = await productService.DeleteImageAsync(EditingProductId, img.ImageUrl);
+            if (!result.Success)
+                return;
+        }
+
+        ProductForm.Images.Remove(img);
+
+        if (!ProductForm.Images.Any(i => i.IsMain) && ProductForm.Images.Any())
+            ProductForm.Images.First().IsMain = true;
+    }
+
+    private void SetMainImage(ProductImageVM img)
+    {
+        foreach (var i in ProductForm.Images)
+            i.IsMain = false;
+
+        img.IsMain = true;
+    }
+
+    private async Task SetFocalPoint(ProductImageVM img, MouseEventArgs e)
+    {
+        // .focal-preview is fixed 200×200px — OffsetX/Y are always in that space
+        var x = Math.Clamp(Math.Round(e.OffsetX / 200.0 * 100, 0), 0, 100);
+        var y = Math.Clamp(Math.Round(e.OffsetY / 200.0 * 100, 0), 0, 100);
+
+        img.ObjectPosition = $"{x}% {y}%";
+        img.SavingPosition = true;
+        StateHasChanged();
+
+        await productService.UpdateImagePositionAsync(EditingProductId, img.ImageUrl, img.ObjectPosition);
+        img.SavingPosition = false;
+        StateHasChanged();
+    }
+
+    private static string GetDotX(string pos)
+    {
+        var parts = pos.Split(' ');
+        return parts.Length >= 1 && parts[0].EndsWith('%') ? parts[0] : "50%";
+    }
+
+    private static string GetDotY(string pos)
+    {
+        var parts = pos.Split(' ');
+        return parts.Length >= 2 && parts[1].EndsWith('%') ? parts[1] : "50%";
+    }
+
+    // ==========================
+    // Delete Product
+    // ==========================
+
+    private async Task DeleteProduct(Guid id)
+    {
+        try
+        {
+            _pageError = string.Empty;
+            var result = await productService.DeleteAsync(id);
+            if (!result.Success)
+            {
+                _pageError = result.Message ?? "Failed to delete product.";
+                Logger.LogWarning("DeleteProduct failed: {Message}", result.Message);
+                return;
+            }
+            await LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "An unexpected error occurred while deleting.";
+            Logger.LogError(ex, "Error deleting product {Id}", id);
+        }
+    }
+
+    private async Task ToggleBestSeller(GetProductDTO product, bool value)
+    {
+        _updatingBestSeller.Add(product.Id);
+        try
+        {
+            var result = await productService.SetBestSellerAsync(product.Id, value);
+            if (result.Success)
+                product.IsBestSeller = value;
+            else
+                Logger.LogWarning("ToggleBestSeller failed for {Id}: {Message}", product.Id, result.Message);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling best seller for {Id}", product.Id);
+        }
+        finally
+        {
+            _updatingBestSeller.Remove(product.Id);
+        }
+    }
+
+    private string ResolveImage(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "/images/placeholder.png";
+        return url;
+    }
+
+    // ==========================
+    // Variant Modal
+    // ==========================
+
+    private async Task OpenVariantModal(GetProductDTO product)
+    {
+        VariantProduct = product;
+        VariantRows = new();
+        GenerateRows = new();
+        VariantError = string.Empty;
+        _showAttrPicker = false;
+        _showNewAttrInput = false;
+        _newAttrName = string.Empty;
+        ShowVariantModal = true;
+        _loadingVariants = true;
+
+        var variantsTask = variantService.GetByProductIdAsync(product.Id);
+        var attrsTask = variantAttributeService.GetAllAsync();
+        await Task.WhenAll(variantsTask, attrsTask);
+
+        AllAttributes = attrsTask.Result;
+        VariantRows = variantsTask.Result.Select(v => new VariantEditRow
+        {
+            VariantId = v.VariantId,
+            AttributesSummary = string.Join(", ", v.Attributes.Select(kv => $"{kv.Key}: {kv.Value}")),
+            Price = v.Price,
+            Stock = v.Stock,
+            IsActive = v.IsActive
+        }).ToList();
+
+        // Pre-populate GenerateRows from existing variants so adding a new attribute
+        // dimension doesn't wipe out the ones already configured.
+        if (variantsTask.Result.Any())
+        {
+            var dimensions = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var v in variantsTask.Result)
+                foreach (var (name, value) in v.Attributes)
+                {
+                    if (!dimensions.ContainsKey(name))
+                        dimensions[name] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    dimensions[name].Add(value);
+                }
+
+            foreach (var (name, values) in dimensions)
+            {
+                var attr = AllAttributes.FirstOrDefault(a =>
+                    string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (attr is not null)
+                    GenerateRows.Add(new AttributeInputRow
+                    {
+                        AttributeId   = attr.Id,
+                        AttributeName = attr.Name,
+                        Values        = values.OrderBy(v => v).ToList()
+                    });
+            }
+        }
+
+        _loadingVariants = false;
+    }
+
+    private void CloseVariantModal()
+    {
+        ShowVariantModal = false;
+        VariantProduct = null;
+    }
+
+    private async Task SaveVariantRow(VariantEditRow row)
+    {
+        row.Saving = true;
+        row.Error = null;
+        var result = await variantService.UpdateVariantAsync(new UpdateVariantDTO
+        {
+            VariantId = row.VariantId,
+            Price = row.Price,
+            Stock = row.Stock,
+            IsActive = row.IsActive
+        });
+        row.Error = result.Success ? null : result.Message;
+        row.Saving = false;
+        if (result.Success)
+            await LoadProducts();
+    }
+
+    private void AddChipOnEnter(KeyboardEventArgs e, AttributeInputRow row)
+    {
+        if (e.Key != "Enter") return;
+        var val = row.CurrentInput.Trim();
+        if (!string.IsNullOrEmpty(val) && !row.Values.Contains(val))
+            row.Values.Add(val);
+        row.CurrentInput = string.Empty;
+    }
+
+    private void OnAttrPickerChange(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (string.IsNullOrEmpty(val)) return;
+
+        if (val == "__new__")
+        {
+            _showNewAttrInput = true;
+            return;
+        }
+
+        if (!Guid.TryParse(val, out var attrId)) return;
+        var attr = AllAttributes.FirstOrDefault(a => a.Id == attrId);
+        if (attr is null) return;
+        if (GenerateRows.Any(r => r.AttributeId == attrId)) return;
+
+        GenerateRows.Add(new AttributeInputRow { AttributeId = attrId, AttributeName = attr.Name });
+        _showAttrPicker = false;
+    }
+
+    private async Task CreateAndAddAttribute()
+    {
+        var name = _newAttrName.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        try
+        {
+            var result = await variantAttributeService.CreateAsync(name);
+            if (!result.Success)
+            {
+                VariantError = result.Message ?? "Failed to create attribute.";
+                Logger.LogWarning("CreateAttribute failed: {Message}", result.Message);
+                return;
+            }
+
+            var newAttr = new VariantAttributeDTO { Id = result.Data, Name = name };
+            AllAttributes.Add(newAttr);
+            GenerateRows.Add(new AttributeInputRow { AttributeId = newAttr.Id, AttributeName = newAttr.Name });
+            _newAttrName = string.Empty;
+            _showNewAttrInput = false;
+            _showAttrPicker = false;
+        }
+        catch (Exception ex)
+        {
+            VariantError = "An unexpected error occurred while creating the attribute.";
+            Logger.LogError(ex, "Error creating attribute '{Name}'", name);
+        }
+    }
+
+    private async Task GenerateVariants()
+    {
+        if (VariantProduct is null) return;
+        VariantError = string.Empty;
+
+        var rows = GenerateRows.Where(r => r.Values.Any()).ToList();
+        if (!rows.Any()) return;
+
+        foreach (var row in rows)
+        {
+            var pending = row.CurrentInput.Trim();
+            if (!string.IsNullOrEmpty(pending) && !row.Values.Contains(pending))
+                row.Values.Add(pending);
+            row.CurrentInput = string.Empty;
+        }
+
+        _generating = true;
+        try
+        {
+            var dto = new GenerateVariantsDTO
+            {
+                ProductId = VariantProduct.Id,
+                Attributes = rows.Select(r => new VariantAttributeInputDTO
+                {
+                    AttributeId = r.AttributeId!.Value,
+                    Values = r.Values
+                }).ToList()
+            };
+
+            var result = await variantService.GenerateAsync(dto);
+
+            if (!result.Success)
+            {
+                VariantError = result.Message ?? "Failed to generate variants.";
+                Logger.LogWarning("GenerateVariants failed for {ProductId}: {Message}", VariantProduct.Id, result.Message);
+                return;
+            }
+
+            GenerateRows.Clear();
+            await OpenVariantModal(VariantProduct);
+            await LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            VariantError = "An unexpected error occurred while generating variants.";
+            Logger.LogError(ex, "Error generating variants for product {ProductId}", VariantProduct?.Id);
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+}

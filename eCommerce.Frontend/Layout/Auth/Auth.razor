@@ -1,0 +1,12 @@
+﻿@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@inherits LayoutComponentBase
+
+<nav class="auth-navbar">
+    <a href="/" class="auth-logo">@Tenant.StoreName</a>
+</nav>
+
+<div class="auth-layout">
+    @Body
+</div>

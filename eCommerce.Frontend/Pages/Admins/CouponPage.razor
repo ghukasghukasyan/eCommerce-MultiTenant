@@ -1,0 +1,371 @@
+@page "/admin/coupons"
+@using System.ComponentModel.DataAnnotations
+@using ClientLibrary.Models.Coupons
+@using ClientLibrary.Models.Influencers
+@using static ClientLibrary.Enums.Statuses
+@layout Admin
+@attribute [Authorize(Roles = "Admin")]
+@inject ICouponService couponService
+@inject IInfluencerService influencerService
+@inject ILogger<CouponPage> Logger
+
+<GlobalError Error="@_pageError" />
+
+<div class="admin-page">
+
+    <!-- HEADER -->
+    <div class="admin-header">
+        <h2>Coupons</h2>
+        <button class="btn btn-primary" @onclick="OpenCreate">+ Add Coupon</button>
+    </div>
+
+    <!-- CARD -->
+    <div class="admin-card">
+
+        @if (IsLoading)
+        {
+            <TableSkeleton Rows="6" Widths='new[]{"14%","18%","12%","10%","14%","8%","10%","8%"}' />
+        }
+        else if (!Coupons.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa fa-ticket-alt"></i></div>
+                <h4 class="empty-state-title">No coupons yet</h4>
+                <p class="empty-state-sub">Get started by creating your first discount coupon.</p>
+                <button class="btn btn-primary" @onclick="OpenCreate">+ Add coupon</button>
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Influencer</th>
+                        <th>Discount</th>
+                        <th>Commission</th>
+                        <th>Expiry</th>
+                        <th>Used</th>
+                        <th>Status</th>
+                        <th style="width:180px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Coupons)
+                    {
+                        <tr>
+                            <td><strong>@c.Code</strong></td>
+                            <td>
+                                @{
+                                    var inf = Influencers.FirstOrDefault(i => i.Id == c.InfluencerId);
+                                }
+                                <a class="inf-chip" href="/admin/influencer-stats/@c.InfluencerId">
+                                    @if (!string.IsNullOrWhiteSpace(inf?.AvatarUrl))
+                                    {
+                                        <img src="@inf.AvatarUrl" class="inf-chip-avatar" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <span class="inf-chip-initial">
+                                            @(c.InfluencerName?.Length > 0 ? c.InfluencerName[0].ToString().ToUpper() : "?")
+                                        </span>
+                                    }
+                                    <span class="inf-chip-name">@(c.InfluencerName ?? "Unknown")</span>
+                                </a>
+                            </td>
+                            <td>
+                                @if (c.DiscountType == DiscountType.Percentage)
+                                {
+                                    @($"{c.DiscountValue}%")
+                                }
+                                else
+                                {
+                                    @Cur.Format(c.DiscountValue)
+                                }
+                            </td>
+                            <td>@c.CommissionRate%</td>
+                            <td>
+                                @(c.ExpiryDate.HasValue
+                                    ? c.ExpiryDate.Value.ToString("dd MMM yyyy")
+                                    : "No expiry")
+                            </td>
+                            <td>@c.UsedCount</td>
+                            <td>
+                                @if (c.Status == ActivityStatus.Active)
+                                {
+                                    <span class="badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Paused</span>
+                                }
+                            </td>
+                            <td class="action-cell">
+                                <div class="action-buttons">
+                                    <button class="update-btn" @onclick="() => OpenEdit(c)">Edit</button>
+                                    <button class="update-btn" @onclick="() => ToggleStatus(c)">
+                                        @(c.Status == ActivityStatus.Active ? "Pause" : "Activate")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+
+    </div>
+</div>
+
+<!-- MODAL -->
+@if (ShowModal)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseModal">
+        <div class="admin-modal" @onclick:stopPropagation>
+
+            <h4>@(IsEdit ? "Edit Coupon" : "Add Coupon")</h4>
+
+            @if (!string.IsNullOrWhiteSpace(ModalError))
+            {
+                <div class="form-error">@ModalError</div>
+            }
+
+            <label>Code</label>
+            <input class="form-control" placeholder="e.g. SUMMER20"
+                   @bind="Form.Code" @bind:event="oninput" />
+
+            @if (!IsEdit)
+            {
+                <label class="mt-3">Influencer</label>
+                <select class="form-control" @bind="Form.InfluencerId">
+                    <option value="@Guid.Empty">— Select influencer —</option>
+                    @foreach (var inf in Influencers)
+                    {
+                        <option value="@inf.Id">@inf.FullName</option>
+                    }
+                </select>
+            }
+
+            <label class="mt-3">Discount type</label>
+            <select class="form-control" @bind="Form.DiscountType">
+                <option value="@DiscountType.Percentage">Percentage (%)</option>
+                <option value="@DiscountType.FixedAmount">Fixed amount (@Tenant.Currency)</option>
+            </select>
+
+            <label class="mt-3">
+                Discount value (@(Form.DiscountType == DiscountType.Percentage ? "%" : Tenant.Currency))
+            </label>
+            <input class="form-control" type="number" min="1"
+                   @bind="Form.DiscountValue" />
+
+            <label class="mt-3">Commission rate (%)</label>
+            <input class="form-control" type="number" min="0" max="100"
+                   @bind="Form.CommissionRate" />
+
+            <label class="mt-3">Expiry date (optional)</label>
+            <input class="form-control" type="date"
+                   value="@(Form.ExpiryDate?.ToString("yyyy-MM-dd"))"
+                   @onchange="e => { var s = e.Value?.ToString(); Form.ExpiryDate = !string.IsNullOrWhiteSpace(s) && DateTime.TryParse(s, out var d) ? d : (DateTime?)null; }" />
+
+            <div class="modal-actions">
+                <button class="btn btn-primary" @onclick="Save" disabled="@IsSaving">
+                    @(IsSaving ? "Saving…" : "Save")
+                </button>
+                <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    private List<GetCouponDTO> Coupons = new();
+    private List<GetInfluencerDTO> Influencers = new();
+
+    private bool IsLoading = true;
+    private bool ShowModal;
+    private bool IsEdit;
+    private bool IsSaving;
+    private string ModalError = string.Empty;
+    private string _pageError = string.Empty;
+
+    private CouponFormModel Form = new();
+    private Guid EditingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadCoupons(), LoadInfluencers());
+        IsLoading = false;
+    }
+
+    private async Task LoadCoupons()
+    {
+        try
+        {
+            Coupons = await couponService.GetAllAsync();
+            _pageError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load coupons. Please refresh.";
+            Logger.LogError(ex, "Error loading coupons");
+        }
+    }
+
+    private async Task LoadInfluencers()
+    {
+        try
+        {
+            Influencers = (await influencerService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "Failed to load influencers. Coupon creation may be unavailable.";
+            Logger.LogError(ex, "Error loading influencers for coupon page");
+        }
+    }
+
+    private void OpenCreate()
+    {
+        IsEdit = false;
+        Form = new CouponFormModel();
+        ModalError = string.Empty;
+        ShowModal = true;
+    }
+
+    private void OpenEdit(GetCouponDTO c)
+    {
+        IsEdit = true;
+        EditingId = c.Id;
+        Form = new CouponFormModel
+        {
+            Code = c.Code,
+            InfluencerId = c.InfluencerId,
+            DiscountType = c.DiscountType,
+            DiscountValue = c.DiscountValue,
+            CommissionRate = c.CommissionRate,
+            ExpiryDate = c.ExpiryDate
+        };
+        ModalError = string.Empty;
+        ShowModal = true;
+    }
+
+    private void CloseModal() => ShowModal = false;
+
+    private async Task Save()
+    {
+        ModalError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(Form.Code))
+        {
+            ModalError = "Code is required.";
+            return;
+        }
+
+        if (!IsEdit && Form.InfluencerId == Guid.Empty)
+        {
+            ModalError = "Please select an influencer.";
+            return;
+        }
+
+        if (Form.DiscountValue <= 0)
+        {
+            ModalError = "Discount value must be greater than 0.";
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            ClientLibrary.Models.Responses.ServiceResponse<Guid> result;
+
+            if (IsEdit)
+            {
+                result = await couponService.UpdateAsync(new UpdateCouponDTO
+                {
+                    Id = EditingId,
+                    Code = Form.Code,
+                    DiscountType = Form.DiscountType,
+                    DiscountValue = Form.DiscountValue,
+                    CommissionRate = Form.CommissionRate,
+                    ExpiryDate = Form.ExpiryDate
+                });
+            }
+            else
+            {
+                result = await couponService.CreateAsync(new CreateCouponDTO
+                {
+                    Code = Form.Code,
+                    InfluencerId = Form.InfluencerId,
+                    DiscountType = Form.DiscountType,
+                    DiscountValue = Form.DiscountValue,
+                    CommissionRate = Form.CommissionRate,
+                    ExpiryDate = Form.ExpiryDate
+                });
+            }
+
+            if (!result.Success)
+            {
+                ModalError = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Something went wrong. Please try again."
+                    : result.Message;
+                Logger.LogWarning("SaveCoupon failed: {Message}", result.Message);
+                return;
+            }
+
+            CloseModal();
+            await LoadCoupons();
+        }
+        catch (Exception ex)
+        {
+            ModalError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error saving coupon");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task ToggleStatus(GetCouponDTO c)
+    {
+        var newStatus = c.Status == ActivityStatus.Active
+            ? ActivityStatus.Paused
+            : ActivityStatus.Active;
+        try
+        {
+            _pageError = string.Empty;
+            var result = await couponService.UpdateStatusAsync(new UpdateCouponStatusDTO
+            {
+                Id = c.Id,
+                Status = newStatus
+            });
+            if (!result.Success)
+            {
+                _pageError = result.Message ?? "Failed to update coupon status.";
+                Logger.LogWarning("ToggleCouponStatus failed for {Id}: {Message}", c.Id, result.Message);
+                return;
+            }
+            await LoadCoupons();
+        }
+        catch (Exception ex)
+        {
+            _pageError = "An unexpected error occurred. Please try again.";
+            Logger.LogError(ex, "Error toggling coupon status for {Id}", c.Id);
+        }
+    }
+
+    private class CouponFormModel
+    {
+        public string Code { get; set; } = "";
+        public Guid InfluencerId { get; set; } = Guid.Empty;
+        public DiscountType DiscountType { get; set; } = DiscountType.Percentage;
+        public decimal DiscountValue { get; set; } = 10;
+        public int CommissionRate { get; set; } = 5;
+        public int? MaxUsages { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+    }
+}

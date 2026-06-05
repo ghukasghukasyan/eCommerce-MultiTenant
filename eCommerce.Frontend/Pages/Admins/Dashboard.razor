@@ -1,0 +1,212 @@
+@page "/admin"
+@layout Admin
+@attribute [Authorize(Roles = "Admin")]
+@using ClientLibrary.Models.Dashboard
+@using static ClientLibrary.Enums.Statuses
+@inject ClientLibrary.Services.Interface.IDashboardService DashboardService
+
+<div class="admin-dashboard">
+
+    <div class="dash-header">
+        <h2>Dashboard</h2>
+        <span class="dash-date">@DateTime.Now.ToString("dddd, dd MMMM yyyy")</span>
+    </div>
+
+    @if (_error != null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_loading)
+    {
+        <div class="kpi-grid">
+            @for (int i = 0; i < 8; i++)
+            {
+                <div class="skeleton-card"></div>
+            }
+        </div>
+        <div class="dash-bottom">
+            <div class="dash-card">
+                <div class="skeleton-field" style="width:140px;height:18px;margin-bottom:20px;"></div>
+                <div style="display:flex;gap:10px;align-items:flex-end;height:160px;">
+                    @for (int i = 0; i < 7; i++)
+                    {
+                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;">
+                            <div class="skeleton-field" style="width:70%;height:@(40 + i * 15)px;border-radius:6px 6px 0 0;"></div>
+                            <div class="skeleton-field" style="width:24px;height:10px;"></div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="dash-card">
+                <div class="skeleton-field" style="width:120px;height:18px;margin-bottom:20px;"></div>
+                @for (int i = 0; i < 6; i++)
+                {
+                    <div class="skeleton-row" style="margin-bottom:12px;">
+                        <div class="skeleton-cell" style="width:55%;"></div>
+                        <div class="skeleton-cell" style="width:20%;"></div>
+                        <div class="skeleton-cell" style="width:18%;"></div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (_stats is null)
+    {
+        <div class="empty-state">Unable to load dashboard data.</div>
+    }
+    else
+    {
+        <!-- KPI CARDS -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon gold">🛒</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Today's Orders</span>
+                    <span class="kpi-value">@_stats.TodayOrders</span>
+                    <span class="kpi-sub">orders placed today</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon green">💰</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Today's Revenue</span>
+                    <span class="kpi-value">@Cur.Format(_stats.TodayRevenue)</span>
+                    <span class="kpi-sub">revenue today</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon blue">👥</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Total Users</span>
+                    <span class="kpi-value">@_stats.TotalUsers</span>
+                    <span class="kpi-sub">registered accounts</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon rose">⏳</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Pending Orders</span>
+                    <span class="kpi-value">@_stats.PendingOrders</span>
+                    <span class="kpi-sub">awaiting processing</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon purple">📦</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Total Orders</span>
+                    <span class="kpi-value">@_stats.TotalOrders</span>
+                    <span class="kpi-sub">all time</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon teal">💎</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Total Revenue</span>
+                    <span class="kpi-value">@Cur.Format(_stats.TotalRevenue)</span>
+                    <span class="kpi-sub">all time</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon orange">🏷️</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Products</span>
+                    <span class="kpi-value">@_stats.TotalProducts</span>
+                    <span class="kpi-sub">active listings</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon indigo">🌟</div>
+                <div class="kpi-body">
+                    <span class="kpi-label">Influencers</span>
+                    <span class="kpi-value">@_stats.ApprovedInfluencers</span>
+                    <span class="kpi-sub">approved partners</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM: CHART + RECENT ORDERS -->
+        <div class="dash-bottom">
+
+            <!-- 7-DAY REVENUE CHART -->
+            <div class="dash-card">
+                <div class="dash-card-title">Revenue – Last 7 Days</div>
+                @{
+                    var maxRev = _stats.WeeklyRevenue.Max(w => w.Revenue);
+                    if (maxRev == 0) maxRev = 1;
+                }
+                <div class="bar-chart">
+                    @foreach (var day in _stats.WeeklyRevenue)
+                    {
+                        var pct = (double)day.Revenue / (double)maxRev * 100;
+                        var heightPx = (int)(pct / 100 * 130);
+                        if (heightPx < 4) heightPx = day.Revenue > 0 ? 4 : 0;
+                        var isEmpty = day.Revenue == 0;
+                        var tooltip = $"{day.Date:ddd dd MMM}: {Cur.Format(day.Revenue)} ({day.Orders} orders)";
+
+                        <div class="bar-col">
+                            <div class="bar-wrap">
+                                <div class="bar @(isEmpty ? "empty" : "")"
+                                     style="height: @(heightPx)px"
+                                     data-tooltip="@tooltip">
+                                </div>
+                            </div>
+                            <span class="bar-label">@day.Date.ToString("ddd")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- RECENT ORDERS -->
+            <div class="dash-card">
+                <div class="dash-card-title">Recent Orders</div>
+                @if (!_stats.RecentOrders.Any())
+                {
+                    <div style="color:#bbb;font-size:13px;padding:8px 0;">No orders yet.</div>
+                }
+                else
+                {
+                    <div class="recent-orders-list">
+                        @foreach (var order in _stats.RecentOrders)
+                        {
+                            <div class="recent-order-row">
+                                <div>
+                                    <div class="ro-customer">@order.CustomerName</div>
+                                    <div class="ro-date">@order.CreatedAt.ToString("dd MMM, HH:mm")</div>
+                                </div>
+                                <div class="ro-amount">@Cur.Format(order.TotalAmount)</div>
+                                <span class="ro-status status-@order.Status.ToString().ToLower()">
+                                    @order.Status
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+        </div>
+    }
+
+</div>
+
+@code {
+    private DashboardStatsDTO? _stats;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _stats = await DashboardService.GetStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = "Failed to load dashboard data. Please refresh the page.";
+            Console.WriteLine($"[Dashboard] {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,109 @@
+@page "/authentication/login"
+@using Microsoft.AspNetCore.Components.Forms
+@using eCommerce.Frontend.Components.Base
+@attribute [AllowAnonymous]
+@layout Auth
+@inject eCommerce.Frontend.Localization.UiLocalizer L
+
+<div class="login-page beauty">
+    <div class="login-card">
+
+        <h2 class="login-title">@L.Get("welcome_back")</h2>
+        <p class="login-subtitle">@L.Get("sign_in_prompt")</p>
+
+        <!-- ✅ GLOBAL ERROR -->
+        <GlobalError Error="@Error" />
+
+        <EditForm EditContext="_editContext" OnValidSubmit="LoginUser">
+            <DataAnnotationsValidator />
+
+            <!-- EMAIL -->
+            <AppInput @bind-Value="Login.Email"
+                      Label="@L.Get("email_address")" />
+
+            <!-- PASSWORD -->
+            <AppInput @bind-Value="Login.Password"
+                      Label="@L.Get("password")"
+                      Type="password" />
+
+            <div class="text-end" style="font-size:13px;margin-top:-4px;margin-bottom:12px">
+                <a href="/authentication/forgot-password" style="color:#888">@L.Get("forgot_password")</a>
+            </div>
+
+            <button class="btn btn-dark w-100"
+                    type="submit"
+                    disabled="@IsLoading">
+                @(IsLoading ? L.Get("logging_in") : L.Get("login"))
+            </button>
+
+            <div class="text-center mt-3">
+                <a href="/authentication/register">@L.Get("create_an_account")</a>
+            </div>
+
+        </EditForm>
+
+    </div>
+</div>
+
+@code {
+    string _returnUrl;
+
+    bool IsLoading;
+    string Error = null;
+
+    public LoginUserDTO Login { get; set; } = new();
+
+    EditContext _editContext;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _editContext = new EditContext(Login);
+
+        var uri = new Uri(NavManager.Uri);
+        var query = uri.Query.TrimStart('?');
+        foreach (var part in query.Split('&'))
+        {
+            var kv = part.Split('=', 2);
+            if (kv.Length == 2 && kv[0] == "returnUrl")
+            {
+                var raw = Uri.UnescapeDataString(kv[1]);
+                    // Reject protocol-relative (//evil.com) and absolute URLs
+                    if (!string.IsNullOrWhiteSpace(raw) && !raw.StartsWith("//") && !raw.Contains("://"))
+                        _returnUrl = raw.TrimStart('/');
+                break;
+            }
+        }
+
+        var authState = await authStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            NavManager.NavigateTo(string.IsNullOrEmpty(_returnUrl) ? "/" : $"/{_returnUrl}");
+        }
+    }
+
+    async Task LoginUser()
+    {
+        IsLoading = true;
+        Error = null;
+
+        var result = await authService.LoginUser(Login);
+
+        IsLoading = false;
+
+        Error = result.GetErrorMessage();
+        if (Error != null)
+            return;
+
+        await tokenService.SetTokensAsync(
+            result.Token,
+            result.RefreshToken,
+            AppConstants.Cookie.CookieExpirationTime,
+            AppConstants.Cookie.Path
+        );
+
+        (authStateProvider as CustomAuthStateProvider)!
+            .NotifyAuthenticationState();
+
+        NavManager.NavigateTo(string.IsNullOrEmpty(_returnUrl) ? "/" : $"/{_returnUrl}");
+    }
+}

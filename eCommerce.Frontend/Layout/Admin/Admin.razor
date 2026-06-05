@@ -1,0 +1,88 @@
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.States
+@using eCommerce.Frontend.Services
+@inherits LayoutComponentBase
+@inject OrderNotificationState NotificationState
+@inject ITokenService TokenService
+@inject eCommerce.Frontend.Models.TenantConfig Tenant
+@implements IDisposable
+
+<div class="admin-layout">
+    <AdminNavBar />
+    <main class="admin-content">
+        @Body
+    </main>
+</div>
+
+@if (_toast is not null)
+{
+    <div class="order-toast @(_toastVisible ? "order-toast--visible" : "order-toast--hidden")">
+        <div class="order-toast-icon">
+            <i class="fa fa-shopping-bag"></i>
+        </div>
+        <div class="order-toast-body">
+            <div class="order-toast-title">New Order!</div>
+            <div class="order-toast-sub">@_toast.CustomerName &mdash; @Cur.Format(_toast.TotalAmount)</div>
+        </div>
+        <button class="order-toast-close" @onclick="DismissToast">&times;</button>
+    </div>
+}
+
+@code {
+    private NewOrderNotification? _toast;
+    private bool _toastVisible;
+    private System.Threading.Timer? _dismissTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Cur.InitializeAsync();
+        NotificationState.OnNewOrder += HandleNewOrder;
+
+        var token = await TokenService.GetJWTTokenAsync();
+        var hubBase = Tenant.HubBaseUrl ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(token) && !string.IsNullOrWhiteSpace(hubBase))
+            await NotificationState.StartAsync(hubBase, token);
+    }
+
+    private void HandleNewOrder(NewOrderNotification notification)
+    {
+        _toast = notification;
+        _toastVisible = true;
+        InvokeAsync(StateHasChanged);
+
+        _dismissTimer?.Dispose();
+        _dismissTimer = new System.Threading.Timer(_ =>
+        {
+            _toastVisible = false;
+            InvokeAsync(StateHasChanged);
+
+            System.Threading.Timer? cleanup = null;
+            cleanup = new System.Threading.Timer(__ =>
+            {
+                _toast = null;
+                InvokeAsync(StateHasChanged);
+                cleanup?.Dispose();
+            }, null, 400, System.Threading.Timeout.Infinite);
+        }, null, 5000, System.Threading.Timeout.Infinite);
+    }
+
+    private void DismissToast()
+    {
+        _toastVisible = false;
+        _dismissTimer?.Dispose();
+
+        _ = Task.Delay(400).ContinueWith(_ =>
+        {
+            _toast = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    public void Dispose()
+    {
+        NotificationState.OnNewOrder -= HandleNewOrder;
+        _dismissTimer?.Dispose();
+    }
+}

@@ -1,0 +1,403 @@
+@page "/product/{ProductId:guid}"
+@using ClientLibrary.Helpers.Implementation
+@using ClientLibrary.Helpers.Interface
+@using ClientLibrary.Models.Products
+@using ClientLibrary.States
+@inject CartHelper CartHelper
+
+@if (_loading)
+{
+    <div class="product-detail-loading">
+        <i class="fa fa-spinner fa-spin" style="font-size:2rem; color:#ddd;"></i>
+    </div>
+}
+else if (_product is null)
+{
+    <div class="product-detail-notfound">
+        <i class="fa fa-box-open"></i>
+        <p>Product not found.</p>
+        <a href="/" style="color:#111; font-size:13px;">← Back to home</a>
+    </div>
+}
+else
+{
+    <div class="product-detail-page">
+
+        <!-- BREADCRUMB -->
+        <nav class="product-breadcrumb">
+            <a href="/">Home</a>
+            <span class="product-breadcrumb-sep">›</span>
+            @if (_product.Category is not null)
+            {
+                <a href="/category/@_product.CategoryId">@_product.Category.Name</a>
+                <span class="product-breadcrumb-sep">›</span>
+            }
+            <span class="product-breadcrumb-current">@_product.Name</span>
+        </nav>
+
+        <!-- MAIN GRID -->
+        <div class="product-detail-grid">
+
+            <!-- LEFT: GALLERY -->
+            <div class="product-gallery">
+
+                <div class="product-main-image-wrap"
+                     @ontouchstart="OnTouchStart"
+                     @ontouchend="OnTouchEnd"
+                     @onclick="OpenLightbox">
+                    <div class="slider-track"
+                         style="transform: translateX(-@(_currentIndex * 100)%);">
+                        @foreach (var img in _images)
+                        {
+                            <img src="@img.ImageUrl"
+                                 class="product-image"
+                                 style="object-position: @(img.ObjectPosition ?? "center")"
+                                 alt="@_product.Name" />
+                        }
+                    </div>
+
+                    @if (_images.Count > 1)
+                    {
+                        <button class="slider-btn left" @onclick="PrevImage" @onclick:stopPropagation>‹</button>
+                        <button class="slider-btn right" @onclick="NextImage" @onclick:stopPropagation>›</button>
+                    }
+                </div>
+
+                @if (_images.Count > 1)
+                {
+                    <div class="product-thumbnails">
+                        @for (int i = 0; i < _images.Count; i++)
+                        {
+                            var idx = i;
+                            <div class="product-thumb @(_currentIndex == idx ? "active" : "")"
+                                 @onclick="() => _currentIndex = idx">
+                                <img src="@_images[idx].ImageUrl" alt="" loading="lazy" />
+                            </div>
+                        }
+                    </div>
+                }
+
+            </div>
+
+            <!-- RIGHT: INFO -->
+            <div class="product-detail-info">
+
+                @if (_product.Category is not null)
+                {
+                    <div class="product-detail-category">@_product.Category.Name</div>
+                }
+
+                <h1 class="product-detail-name">@_product.Name</h1>
+
+                <div class="product-detail-price">@Cur.Format(DisplayPrice)</div>
+
+                <div class="product-detail-divider"></div>
+
+                @if (_attributeKeys.Count > 0)
+                {
+                    <div class="variant-selector">
+                        @foreach (var key in _attributeKeys)
+                        {
+                            <div class="variant-group">
+                                <span class="variant-group-label">@key</span>
+                                <div class="variant-options">
+                                    @foreach (var val in _attributeValues[key])
+                                    {
+                                        var isSelected = _selectedAttributes.TryGetValue(key, out var sel) && sel == val;
+                                        var isAvailable = IsValueAvailable(key, val);
+                                        <button class="variant-option-btn @(isSelected ? "selected" : "") @(!isAvailable ? "unavailable" : "")"
+                                                disabled="@(!isAvailable)"
+                                                @onclick="() => SelectAttribute(key, val)">
+                                            @val
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="product-detail-divider"></div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_product.Description))
+                {
+                    <div class="product-detail-desc-label">Description</div>
+                    <p class="product-detail-description">@_product.Description</p>
+                }
+
+                <div class="product-detail-stock @(DisplayStock == 0 ? "out-of-stock" : "")">
+                    @if (DisplayStock == 0)
+                    {
+                        <span><i class="fa fa-times-circle"></i> Out of stock</span>
+                    }
+                    else if (DisplayStock < 5)
+                    {
+                        <span><i class="fa fa-exclamation-circle" style="color:#f59e0b;"></i> Only @DisplayStock left</span>
+                    }
+                    else
+                    {
+                        <span><i class="fa fa-check-circle" style="color:#16a34a;"></i> In stock</span>
+                    }
+                </div>
+
+                <button class="product-detail-add-btn"
+                        disabled="@(!CanAddToCart || _addingToCart)"
+                        @onclick="AddToCart">
+                    @if (_addingToCart)
+                    {
+                        <span><i class="fa fa-spinner fa-spin"></i></span>
+                    }
+                    else if (_addedToCart)
+                    {
+                        <span><i class="fa fa-check"></i> Added!</span>
+                    }
+                    else if (!VariantFullySelected)
+                    {
+                        <span>Select options</span>
+                    }
+                    else
+                    {
+                        <span>@L["add_to_cart"]</span>
+                    }
+                </button>
+
+            </div>
+        </div>
+
+        <!-- RELATED PRODUCTS -->
+        @if (_product.CategoryId != Guid.Empty)
+        {
+            <section class="product-related">
+                <h2 class="product-related-title">You may also like</h2>
+                <CategoryProducts CategoryId="_product.CategoryId" Take="4" />
+            </section>
+        }
+
+    </div>
+
+    <!-- STICKY ADD TO CART (mobile only) -->
+    <div class="sticky-atc @(DisplayStock == 0 ? "sticky-atc--oos" : "")">
+        <div class="sticky-atc-info">
+            <span class="sticky-atc-name">@_product.Name</span>
+            <span class="sticky-atc-price">@Cur.Format(DisplayPrice)</span>
+        </div>
+        <button class="sticky-atc-btn"
+                disabled="@(!CanAddToCart || _addingToCart)"
+                @onclick="AddToCart">
+            @if (_addingToCart)
+            {
+                <i class="fa fa-spinner fa-spin"></i>
+            }
+            else if (_addedToCart)
+            {
+                <i class="fa fa-check"></i>
+                <span>Added!</span>
+            }
+            else if (!VariantFullySelected)
+            {
+                <span>Select options</span>
+            }
+            else if (DisplayStock == 0)
+            {
+                <span>@L["out_of_stock"]</span>
+            }
+            else
+            {
+                <span>@L["add_to_cart"]</span>
+            }
+        </button>
+    </div>
+}
+
+@if (_lightboxOpen && _images.Count > 0)
+{
+    <div class="product-lightbox" @onclick="CloseLightbox">
+
+        <button class="lightbox-close" @onclick:stopPropagation @onclick="CloseLightbox">
+            <i class="fa fa-times"></i>
+        </button>
+
+        <div class="lightbox-img-wrap" @onclick:stopPropagation>
+            <img src="@_images[_lightboxIndex].ImageUrl"
+                 class="lightbox-img"
+                 alt="@_product!.Name" />
+        </div>
+
+        @if (_images.Count > 1)
+        {
+            <button class="lightbox-nav prev" @onclick:stopPropagation @onclick="LightboxPrev">‹</button>
+            <button class="lightbox-nav next" @onclick:stopPropagation @onclick="LightboxNext">›</button>
+            <div class="lightbox-counter">@(_lightboxIndex + 1) / @_images.Count</div>
+        }
+
+    </div>
+}
+
+
+@code {
+    [Parameter] public Guid ProductId { get; set; }
+
+    private GetProductDTO? _product;
+    private List<ProductImageDTO> _images = new();
+    private int _currentIndex;
+    private bool _loading = true;
+    private bool _addedToCart;
+    private double _touchStartX;
+
+    private bool _lightboxOpen;
+    private int _lightboxIndex;
+    private bool _addingToCart;
+
+    private void OpenLightbox()
+    {
+        _lightboxIndex = _currentIndex;
+        _lightboxOpen = true;
+    }
+
+    private void CloseLightbox() => _lightboxOpen = false;
+
+    private void LightboxPrev() =>
+        _lightboxIndex = (_lightboxIndex - 1 + _images.Count) % _images.Count;
+
+    private void LightboxNext() =>
+        _lightboxIndex = (_lightboxIndex + 1) % _images.Count;
+
+    // Variant selector state
+    private List<string> _attributeKeys = new();
+    private Dictionary<string, List<string>> _attributeValues = new();
+    private Dictionary<string, string> _selectedAttributes = new();
+    private VariantDTO? _selectedVariant;
+
+    private decimal DisplayPrice => _selectedVariant?.Price ?? _product?.Price ?? 0;
+    private int DisplayStock => _selectedVariant?.Stock ?? _product?.Stock ?? 0;
+    private Guid DisplayVariantId => _selectedVariant?.VariantId ?? _product?.DefaultVariantId ?? Guid.Empty;
+
+    private bool HasVariants => _attributeKeys.Count > 0;
+    private bool VariantFullySelected => !HasVariants || _selectedVariant is not null;
+    private bool CanAddToCart => VariantFullySelected && DisplayStock > 0;
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _currentIndex = 0;
+        _addedToCart = false;
+        _selectedAttributes = new();
+        _selectedVariant = null;
+
+        _product = await productService.GetByIdAsync(ProductId);
+
+        if (_product is not null)
+        {
+            _images = _product.Images?
+                .OrderByDescending(i => i.IsMain)
+                .ThenBy(i => i.DisplayOrder)
+                .ToList() ?? new();
+
+            BuildVariantOptions();
+        }
+
+        _loading = false;
+    }
+
+    private void BuildVariantOptions()
+    {
+        if (_product?.Variants is not { Count: > 0 }) return;
+
+        var activeVariants = _product.Variants.Where(v => v.IsActive).ToList();
+        _attributeKeys = activeVariants
+            .SelectMany(v => v.Attributes.Keys)
+            .Distinct()
+            .OrderBy(k => k)
+            .ToList();
+
+        _attributeValues = _attributeKeys.ToDictionary(
+            key => key,
+            key => activeVariants
+                .Where(v => v.Attributes.ContainsKey(key))
+                .Select(v => v.Attributes[key])
+                .Distinct()
+                .OrderBy(v => v)
+                .ToList());
+    }
+
+    private void SelectAttribute(string key, string value)
+    {
+        _selectedAttributes[key] = value;
+        ResolveVariant();
+    }
+
+    private void ResolveVariant()
+    {
+        if (_product?.Variants is null) return;
+        _selectedVariant = _product.Variants.FirstOrDefault(v =>
+            v.IsActive &&
+            _selectedAttributes.All(kv =>
+                v.Attributes.TryGetValue(kv.Key, out var val) && val == kv.Value));
+    }
+
+    private bool IsValueAvailable(string key, string value)
+    {
+        if (_product?.Variants is null) return true;
+        var partial = new Dictionary<string, string>(_selectedAttributes) { [key] = value };
+        return _product.Variants.Any(v =>
+            v.IsActive &&
+            v.Stock > 0 &&
+            partial.All(kv => v.Attributes.TryGetValue(kv.Key, out var val) && val == kv.Value));
+    }
+
+    private void PrevImage()
+    {
+        if (_images.Count == 0) return;
+        _currentIndex = (_currentIndex - 1 + _images.Count) % _images.Count;
+    }
+
+    private void NextImage()
+    {
+        if (_images.Count == 0) return;
+        _currentIndex = (_currentIndex + 1) % _images.Count;
+    }
+
+    private void OnTouchStart(TouchEventArgs e)
+    {
+        if (e.ChangedTouches.Length > 0)
+            _touchStartX = e.ChangedTouches[0].ClientX;
+    }
+
+    private void OnTouchEnd(TouchEventArgs e)
+    {
+        if (e.ChangedTouches.Length == 0 || _images.Count < 2) return;
+        var delta = e.ChangedTouches[0].ClientX - _touchStartX;
+        if (Math.Abs(delta) > 40)
+        {
+            if (delta < 0) NextImage();
+            else PrevImage();
+        }
+    }
+
+    private async Task AddToCart()
+    {
+        if (_product is null || !CanAddToCart || _addingToCart) return;
+
+        _addingToCart = true;
+        StateHasChanged();
+
+        var image = _images.FirstOrDefault(i => i.IsMain)?.ImageUrl
+                    ?? _images.FirstOrDefault()?.ImageUrl
+                    ?? string.Empty;
+
+        await CartHelper.AddToCart(
+            DisplayVariantId,
+            _product.Id,
+            _product.Name,
+            image,
+            DisplayPrice,
+            variantAttributes: _selectedVariant?.Attributes);
+
+        _addingToCart = false;
+        _addedToCart = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        _addedToCart = false;
+        StateHasChanged();
+    }
+}
