@@ -17,10 +17,10 @@ using eCommerce.Frontend.Localization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Load tenant config before registering services so ApiBaseUrl and branding are available
+// Load tenant config from the API before registering services
 var bootstrapHttp = new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) };
 TenantConfig tenant;
-try { tenant = await bootstrapHttp.GetFromJsonAsync<TenantConfig>("tenant.json") ?? new TenantConfig(); }
+try { tenant = await bootstrapHttp.GetFromJsonAsync<TenantConfig>("api/tenant") ?? new TenantConfig(); }
 catch { tenant = new TenantConfig(); }
 builder.Services.AddSingleton(tenant);
 
@@ -55,17 +55,11 @@ builder.Services.AddScoped<CartState>();
 builder.Services.AddSingleton<OrderNotificationState>();
 builder.Services.AddSingleton<UiOverlayState>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
-// tenant.json overrides appsettings; appsettings.Development.json serves as local dev fallback
-var apiBaseUrl = tenant.ApiBaseUrl ?? builder.Configuration["ApiBaseUrl"];
+// In multi-tenant, the API is always on the same origin proxied at /api/
+var apiBaseUrl = "/api/";
 
 Console.WriteLine($"ENV: {builder.HostEnvironment.Environment}");
 Console.WriteLine($"Tenant: {tenant.StoreName}");
-Console.WriteLine($"ApiBaseUrl: {apiBaseUrl}");
-
-if (string.IsNullOrWhiteSpace(apiBaseUrl))
-{
-    throw new Exception("ApiBaseUrl is not configured! Set it in tenant.json or appsettings.json.");
-}
 
 // NAMED CLIENT
 builder.Services.AddHttpClient(AppConstants.ApiClient.Name, client =>

@@ -14,6 +14,7 @@ using eCommerce.Domain.Interfaces.Products;
 using eCommerce.Domain.Interfaces.Users;
 using eCommerce.Infrastructure.Data;
 using eCommerce.Infrastructure.Middlewares;
+using eCommerce.Infrastructure.MultiTenant;
 using eCommerce.Infrastructure.Repositories;
 using eCommerce.Infrastructure.Repositories.Authentication;
 using eCommerce.Infrastructure.Repositories.Categories;
@@ -38,14 +39,19 @@ namespace eCommerce.Infrastructure.DependencyInjection
     {
         public static IServiceCollection AddInfrastructureService(this IServiceCollection services, IConfiguration config)
         {
-            services.AddDbContext<ECommerceContext>(option =>
-            option.UseNpgsql(config.GetConnectionString("ECommerce"),
-            sqlOptions =>
+            services.AddSingleton<TenantRegistry>();
+            services.AddScoped<TenantContext>();
+            services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
+
+            services.AddDbContext<ECommerceContext>((serviceProvider, options) =>
             {
-                sqlOptions.MigrationsAssembly(typeof(ServiceContainer).Assembly.FullName);
-                sqlOptions.EnableRetryOnFailure();
-            }).UseExceptionProcessor(),
-            ServiceLifetime.Scoped);
+                var tenant = serviceProvider.GetRequiredService<ITenantContext>();
+                options.UseNpgsql(tenant.ConnectionString, sql =>
+                {
+                    sql.MigrationsAssembly(typeof(ServiceContainer).Assembly.FullName);
+                    sql.EnableRetryOnFailure();
+                }).UseExceptionProcessor();
+            }, ServiceLifetime.Scoped);
 
             services.AddScoped(typeof(IAppLogger<>), typeof(SerilogLoggerAdapter<>));
             services.AddDefaultIdentity<AppUser>(options =>
@@ -133,6 +139,7 @@ namespace eCommerce.Infrastructure.DependencyInjection
 
         public static IApplicationBuilder UseInfrastructureService(this IApplicationBuilder app)
         {
+            app.UseMiddleware<TenantMiddleware>();
             app.UseMiddleware<ExceptionHandlingMiddleware>();
             return app;
         }

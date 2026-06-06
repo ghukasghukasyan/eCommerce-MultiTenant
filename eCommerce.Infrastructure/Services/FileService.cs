@@ -1,4 +1,5 @@
 ﻿using eCommerce.Application.Services.Interfaces.Files;
+using eCommerce.Infrastructure.MultiTenant;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
@@ -8,7 +9,7 @@ using static eCommerce.Domain.Enums.Types;
 
 namespace eCommerce.Infrastructure.Services
 {
-    public class FileService(IWebHostEnvironment env) : IFileService
+    public class FileService(IWebHostEnvironment env, ITenantContext tenant) : IFileService
     {
         private readonly IWebHostEnvironment _env = env;
         private const long MaxImageSize = 20 * 1024 * 1024;
@@ -27,6 +28,7 @@ namespace eCommerce.Infrastructure.Services
             var folder = Path.Combine(
                 _env.WebRootPath,
                 "uploads",
+                tenant.Slug,
                 entityType.ToString().ToLower(),
                 entityId.ToString());
 
@@ -44,7 +46,7 @@ namespace eCommerce.Infrastructure.Services
 
             await image.SaveAsWebpAsync(path, new WebpEncoder { Quality = WebpQuality });
 
-            return $"/uploads/{entityType.ToString().ToLower()}/{entityId}/{fileName}";
+            return $"/uploads/{tenant.Slug}/{entityType.ToString().ToLower()}/{entityId}/{fileName}";
         }
 
         public void DeleteProductImage(string imageUrl)
@@ -61,6 +63,7 @@ namespace eCommerce.Infrastructure.Services
         public void DeleteProductFolder(Guid productId)
         {
             var folder = Path.Combine(_env.WebRootPath, "uploads",
+                tenant.Slug,
                 FileEntityType.Product.ToString().ToLower(), productId.ToString());
             if (Directory.Exists(folder))
                 Directory.Delete(folder, true);

@@ -1,0 +1,50 @@
+{
+  "your-tenant-slug": {
+    "connectionString": "Host=postgres;Port=5432;Database=tenant_yourslug;Username=postgres;Password=YOUR_PASSWORD",
+    "config": {
+      "StoreName": "STORE",
+      "GoogleAnalyticsId": "",
+      "StoreDisplayName": "Your Store Name",
+      "LogoUrl": "/logos/your-logo.png",
+      "Tagline": "Your tagline here.",
+      "AboutLabel": "About Us",
+      "ContactPhone": "+1234567890",
+      "ContactPhoneDisplay": "+1 234 567 890",
+      "CopyrightYear": 2026,
+      "ApiBaseUrl": "/api/",
+      "HubBaseUrl": "https://yourdomain.com",
+      "Colors": {
+        "Primary": "#111111",
+        "Accent": "#f26522",
+        "Soft": "#e89cae",
+        "Background": "#fafaf8"
+      },
+      "FooterTrustBadges": [
+        { "Icon": "fa fa-lock",  "Label": "Secure Checkout" },
+        { "Icon": "fa fa-truck", "Label": "Fast Delivery" }
+      ],
+      "BrandHighlights": [
+        { "Icon": "fa fa-star", "Title": "Quality",       "Description": "Premium products" },
+        { "Icon": "fa fa-truck","Title": "Fast Delivery", "Description": "1–3 day shipping" }
+      ],
+      "EditorialBanner": {
+        "Label": "Our Story",
+        "Title": "Your headline.",
+        "Subtitle": "A short description of your brand.",
+        "CtaLabel": "Learn More",
+        "BackgroundImagePath": "/uploads/images/your-slug/editorial-bg.jpg"
+      },
+      "HeroSlides": [
+        {
+          "ImagePath": "/uploads/images/your-slug/slide1.jpg",
+          "FallbackGradient": "linear-gradient(135deg, #1a1a1a 0%, #3a2a1a 100%)",
+          "Tag": "NEW ARRIVALS",
+          "Title": "Slide Title",
+          "Subtitle": "Slide subtitle.",
+          "CtaLabel": "Shop Now",
+          "CtaUrl": "/category/your-category-id"
+        }
+      ]
+    }
+  }
+}

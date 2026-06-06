@@ -6,6 +6,7 @@ using eCommerce.Application.Services.Interfaces.Notifications;
 using eCommerce.Application.Validations.Authentication;
 using eCommerce.Infrastructure.Data;
 using eCommerce.Infrastructure.DependencyInjection;
+using eCommerce.Infrastructure.MultiTenant;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
@@ -19,8 +20,6 @@ using System.Threading.RateLimiting;
 
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Configuration.AddJsonFile("/app/tenant.json", optional: true, reloadOnChange: false);
 
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
@@ -110,9 +109,7 @@ builder.Services.AddApplicationService();
 builder.Services.AddHealthChecks();
 var corsOrigins = builder.Configuration["Cors:AllowedOrigins"]
     ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    ?? (builder.Configuration["HubBaseUrl"] is { Length: > 0 } hub
-        ? [hub]
-        : ["https://localhost:7089", "https://localhost:5246"]);
+    ?? ["https://localhost:7089", "https://localhost:5246"];
 
 builder.Services.AddCors(cors =>
 {
@@ -130,10 +127,16 @@ try
 
     var app = builder.Build();
 
-    // Auto-run pending migrations
-    using (var scope = app.Services.CreateScope())
+    // Run migrations for every tenant database
+    var registry = app.Services.GetRequiredService<TenantRegistry>();
+    foreach (var (slug, entry) in registry.All)
     {
+        using var scope = app.Services.CreateScope();
+        var tenantCtx = scope.ServiceProvider.GetRequiredService<TenantContext>();
+        tenantCtx.Slug = slug;
+        tenantCtx.ConnectionString = entry.ConnectionString;
         var db = scope.ServiceProvider.GetRequiredService<ECommerceContext>();
+        Log.Logger.Information("Migrating database for tenant '{Slug}'", slug);
         await db.Database.MigrateAsync();
     }
 
