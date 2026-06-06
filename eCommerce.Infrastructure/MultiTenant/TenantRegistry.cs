@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace eCommerce.Infrastructure.MultiTenant
 {
@@ -12,9 +13,15 @@ namespace eCommerce.Infrastructure.MultiTenant
             PropertyNameCaseInsensitive = true
         };
 
-        public TenantRegistry(IConfiguration config)
+        public TenantRegistry(IConfiguration config, IHostEnvironment env)
         {
-            var path = config["Tenants:ConfigPath"] ?? "/app/tenants.json";
+            var configPath = config["Tenants:ConfigPath"] ?? "/app/tenants.json";
+
+            // Resolve relative paths from the content root so dotnet run works from any directory
+            var path = Path.IsPathRooted(configPath)
+                ? configPath
+                : Path.Combine(env.ContentRootPath, configPath);
+
             using var stream = File.OpenRead(path);
             _tenants = JsonSerializer.Deserialize<Dictionary<string, TenantEntry>>(stream, _jsonOptions) ?? new();
         }

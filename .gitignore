@@ -17,6 +17,7 @@ slides/**/*.webp
 appsettings.*.Local.json
 secrets.json
 tenants.json
+tenants.local.json
 
 # Protect production appsettings from accidental commit
 # Real values go in environment variables or Docker secrets — never in these files
